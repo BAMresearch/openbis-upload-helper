@@ -1,0 +1,397 @@
+@font-face {
+    font-family: "BAM Klavika-Light";
+    src: url("../assets/fonts/BAMKlavika-Light.ttf");
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "BAM Klavika-LightItalic";
+    src: url("../assets/fonts/BAMKlavika-LightItalic.ttf");
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "BAM Klavika-Medium";
+    src: url("../assets/fonts/BAMKlavika-Medium.ttf");
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "BAM Klavika-MediumItalic";
+    src: url("../assets/fonts/BAMKlavika-MediumItalic.ttf");
+    font-weight: normal;
+    font-style: normal;
+}
+
+:root {
+    --text-font: "BAM Klavika-Light";
+    --titles-font: "BAM Klavika-Medium";
+    --code-font: "Noto Mono";
+
+    /* BAM colors */
+    --bam-weiss: rgb(243, 243, 243);
+    --bam-weiss-dark: rgb(238, 241, 243);
+    --bam-schwarz-100: rgb(0, 40, 50);
+    --bam-schwarz-80: rgb(50, 84, 99);
+    --bam-schwarz-60: rgb(95, 123, 137);
+    --bam-schwarz-45: rgb(125, 149, 163);
+    --bam-schwarz-30: rgb(163, 184, 195);
+    --bam-schwarz-15: rgb(204, 216, 223);
+    --bam-rot: rgb(210, 0, 30);
+    --bam-rot-dark: rgb(180, 15, 30);
+    --bam-rot-darker: rgb(140, 20, 25);
+    --bam-rot-darkest: rgb(80, 25, 25);
+    --bam-blau: rgb(0, 175, 240);
+    --bam-blau-dark: rgb(0, 137, 186);
+    --bam-blau-darker: rgb(0, 117, 153);
+    --bam-blau-darkest: rgb(0, 85, 110);
+    --bam-grun: rgb(140, 180, 15);
+    --bam-grun-dark: rgb(130, 165, 50);
+    --bam-grun-darker: rgb(90, 140, 50);
+    --bam-grun-darkest: rgb(55, 120, 50);
+    --bam-gelb: rgb(255, 220, 0);
+    --bam-gelb-dark: rgb(250, 185, 0);
+    --bam-gelb-darker: rgb(230, 155, 0);
+    --bam-gelb-darkest: rgb(205, 125, 0);
+
+    /* Backgrounds, primaries, and secondaries */
+    --background-light: var(--bam-weiss);
+    --color-light: var(--bam-schwarz-100);
+    --background-dark: var(--bam-schwarz-100);
+    --color-dark: var(--bam-weiss);
+
+    --code-color-light: var(--bam-grun-darkest);
+    --code-background-light: rgba(204, 216, 223, 0.3);  /* similar to bam-schwarz-15 */
+    --code-color-dark: var(--bam-grun);
+    --code-background-dark: rgba(27, 72, 83, 0.3);
+
+    --grid-background-light: rgba(238, 229, 174, 0.5);
+}
+
+/* General body styling */
+body {
+    background-color: #f9f9f9; /* Very light background to make the card stand out */
+    font-family: var(--text-font), sans-serif;
+    padding: 20px; /* Adding some padding for better spacing */
+}
+
+/* .col-md-8 {
+    width: 100%;
+} */
+
+/* Card Styling */
+.card {
+    border-radius: 10px;
+    border: none;
+    width: 66%;
+    padding: 20px;
+    background-color: #ffffff; /* White card background for a clean look */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); /* Softer shadow to give a floating effect */
+    margin-bottom: 20px; /* Adds some space between cards and elements */
+}
+
+/* Card title styling */
+.card-title {
+    margin-bottom: 20px;
+    color: #2d572c; /* Slightly darker green */
+    text-align: center;
+}
+
+.card-title, h1, h2, h3, h4, h5, h6 {
+    font-family: var(--titles-font), sans-serif;
+}
+
+/* Button Styling */
+.btn-primary {
+    background-color: var(--bam-blau-dark); /* Primary button color */
+    border-color: var(--bam-blau-darkest);
+    transition: all 0.3s ease;
+    color: #fff;
+    padding: 10px 20px; /* More padding for bigger, modern buttons */
+    font-size: 1rem;
+    border-radius: 5px; /* Subtle rounded corners */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Shadow effect for depth */
+}
+
+.btn-primary:hover {
+    background-color: var(--bam-blau-darkest); /* Darker green on hover */
+    border-color: var(--bam-blau-darkest);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15); /* Stronger shadow on hover */
+}
+
+.btn-secondary {
+    background-color: var(--bam-schwarz-80); /* Primary button color */
+    border-color: var(--bam-schwarz-100);
+    transition: all 0.3s ease;
+    color: #fff;
+    padding: 10px 20px; /* More padding for bigger, modern buttons */
+    font-size: 1rem;
+    border-radius: 5px; /* Subtle rounded corners */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Shadow effect for depth */
+}
+
+.btn-secondary:hover {
+    background-color: var(--bam-schwarz-100);
+    border-color: var(--bam-schwarz-100);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15); /* Stronger shadow on hover */
+}
+
+/* Input field styling */
+.form-control {
+    border-radius: 5px;
+    border: 1px solid #ced4da;
+    padding: 10px; /* Add padding for a more user-friendly input */
+    font-size: 1rem; /* Slightly bigger font */
+}
+
+/* Labels styling */
+.form-label {
+    color: #000000; /* Dark for form labels */
+    font-weight: bold;
+    margin-bottom: 0;
+}
+
+/* Alert Styling */
+.alert-info {
+    color: #155724;
+    background-color: #d4edda; /* Light green background */
+    border-color: #c3e6cb;
+    border-radius: 5px;
+    padding: 10px 15px;
+    font-size: 1rem;
+    margin-top: 15px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Adds shadow to alerts */
+}
+
+/* Additional Styling for Responsiveness */
+.container {
+    max-width: 900px; /* Makes sure the content doesn't stretch too wide */
+    margin: 0 auto; /* Center the content */
+}
+
+h5 {
+    text-transform: uppercase; /* Ensures the title is capitalized */
+    letter-spacing: 1px; /* Adds spacing between letters for a modern feel */
+    margin-bottom: 16px;
+}
+
+/*Collapsible log section*/
+.list-group-item-info, .list-group-item-warning, .list-group-item-danger {
+    --bs-list-group-color: black !important;
+    --bs-list-group-border-color: #ffffff !important
+}
+
+.list-group-item-info {
+    --bs-list-group-bg: rgba(0, 175, 240, 0.3) !important; /* BAM blue */
+}
+.list-group-item-warning {
+    --bs-list-group-bg: rgba(255, 220, 0, 0.3) !important; /* BAM yellow */
+}
+.list-group-item-danger {
+    --bs-list-group-bg: rgba(210, 0, 30, 0.3) !important; /* BAM red */
+}
+
+.btn-link {
+    color: black !important;
+    text-decoration: none;
+}
+
+.btn-link:hover,
+.btn-link:focus {
+    color: black !important;
+    text-decoration: none; /* or none, your choice */
+}
+
+.list-group-item + .list-group-item {
+    border-top-width: 8px !important;
+}
+
+button svg.bi-chevron-right {
+  position: relative;
+  top: -2px; /* adjust up/down by changing this value */
+}
+
+.transition-arrow {
+  transition: transform 0.3s ease;
+}
+
+button[aria-expanded="true"] .transition-arrow {
+  transform: rotate(90deg);
+}
+
+.card-number {
+      position: absolute;
+      top: -8px;
+      left: -8px;
+      width: 40px;
+      height: 40px;
+      background-color: var(--bam-blau-dark); /* Primary button color */
+      border-color: var(--bam-blau-darkest);
+      color: white;
+      border-radius: 50%; /* Rounded corners */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+      z-index: 2;
+    }
+
+.vertical-wrapper {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center; /* Ensures vertical centering of children */
+    min-height: 2em; /* Optional: provides minimum height, can be adjusted or removed */
+    padding: 0.5em 0; /* Optional: adds vertical spacing, can be adjusted or removed */
+  }
+
+hr.vertical {
+    position: absolute;
+    height: calc(100% + 20px);;
+    top: -20px;
+    width: 0;
+    bottom: 20px;
+    border: none;
+    border-left: 2px solid black;
+    margin: 0;
+  }
+
+#drop-area {
+    border: 2px dashed #ccc;
+    border-radius: 10px;
+    font-family: sans-serif;
+    text-align: center;
+    margin: 10px auto;
+    padding: 10px;
+    color: #999;
+}
+
+#drop-area.highlight {
+    border-color: var(--bam-blau-dark);
+    background-color: #f3eaff;
+}
+
+ul#file-list {
+    width: 100%;
+    margin: 0;
+    padding: 10px;
+    font-family: sans-serif;
+    list-style: none;
+    margin-bottom: 10px;
+
+    border: 2px solid #ccc;
+    background-clip: padding-box;
+    transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+    border-radius: 0.25rem;
+}
+ul#file-list:empty {
+  border: none;
+}
+
+ul#file-list > li {
+    padding: 5px 10px;
+}
+ul#file-list > li:last-child {
+    border-bottom: none;
+}
+
+
+ul#file-list ul {
+    list-style: none;
+    margin: 5px 0 0 15px;
+    padding: 5px;
+    border: 1px solid #999;
+    border-radius: 0.25rem;
+}
+ul#file-list ul li {
+    padding: 3px 8px;
+    border-bottom: 1px solid #eee;
+}
+ul#file-list ul li:last-child {
+    border-bottom: none;
+}
+
+.tooltip {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  color: var(--bam-schwarz-100)
+}
+
+.tooltip .tooltiptext {
+  visibility: hidden;
+  padding: 0.25em 0.5em;
+  background-color: black;
+  color: #fff;
+  text-align: center;
+  border-radius: 0.25em;
+  white-space: nowrap;
+
+  /* Position the tooltip */
+  position: absolute;
+  z-index: 1;
+  top: 100%;
+  left: 100%;
+  transition-property: visibility;
+  transition-delay: 0s;
+}
+
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+  transition-delay: 0.3s;
+}
+
+.parser-tooltip-group {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltip-trigger {
+  cursor: pointer;
+  color: var(--bam-blau-dark);
+  font-weight: bold;
+}
+
+.tooltip-list {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  min-width: 200px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #ffffff;
+  color: #000000;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  padding: 12px 18px;
+  z-index: 100;
+  transition: opacity 0.2s;
+  font-size: 0.98em;
+}
+
+.parser-tooltip-group:hover .tooltip-list,
+.parser-tooltip-group:focus-within .tooltip-list {
+  visibility: visible;
+  opacity: 1;
+}
+
+.tooltip-list ul {
+  margin: 8px 0 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tooltip-list li {
+  padding: 3px 0;
+  border-bottom: 1px solid #444;
+}
+
+.tooltip-list li:last-child {
+  border-bottom: none;
+}

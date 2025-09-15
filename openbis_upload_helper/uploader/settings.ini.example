@@ -1,0 +1,7 @@
+[settings]
+DEBUG=False
+SECRET_KEY=django-insecure-wiq2-hvjf4#jgoq-&#rg!)hw*(wa9l9^&cgcohq8k6ihitx9f#
+SECRET_ENCRYPTION_KEY=x1_JDNmuikh7MQFzIQJFvmJDFbeOsacJRvvvwq3xv6a=
+ALLOWED_HOSTS = 127.0.0.1, localhost
+CSRF_TRUSTED_ORIGINS = https://ouh.domain.local
+

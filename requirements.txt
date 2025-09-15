@@ -1,6 +1,0 @@
-numpy
-matplotlib
-matplotlib_scalebar
-h5py
-nmrglue
-pybis

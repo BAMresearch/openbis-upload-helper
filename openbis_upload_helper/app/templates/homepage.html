@@ -1,0 +1,197 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="csrf-token" content="{{ csrf_token }}">
+        <title>Data Parser</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+        <link rel="stylesheet" href="{% static 'css/style.css' %}">
+        <link rel="icon" href="{% static 'assets/bammasterdata_blue_transparent.png' %}" type="image/x-icon">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    </head>
+    <body class="bg-light">
+        <div class="d-flex justify-content-end">
+            <form action="{% url 'logout' %}" method="POST">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger" style="background-color: var(--bam-rot);">Logout</button>
+            </form>
+        </div>
+        <div class="container py-5">
+            <div class="row justify-content-center">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-number">1</div>
+                            <div class="tab-content mt-3" id="myTabContent">
+                                <div class="tab-pane fade show active" id="checker-content" role="tabpanel" aria-labelledby="checker-tab">
+                                    <h5 class="text-center">Export Options</h5>
+                                    <form id="upload-form" method="POST" enctype="multipart/form-data">
+                                        {% csrf_token %}
+                                        <div class="mb-3">
+                                            <label for="selectedSpace" class="form-label">Select Space</label>
+                                            {% if spaces %}
+                                                <select class="form-control" id="selectedSpace" name="selected_space" required>
+                                                    <option value="" selected disabled>Select Space</option>
+                                                    {% for space in spaces %}
+                                                        <option value="{{ space }}">{{ space }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            {% else %}
+                                                <select class="form-control" id="selectedSpace" name="selected_space" disabled>
+                                                    <option value="" selected disabled>No spaces available</option>
+                                                </select>
+                                                <div class="text-danger mt-2">No spaces are available for selection. Please contact your administrator.</div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="projectName" class="form-label">Project Name</label>
+                                            <input type="text" class="form-control" id="projectName" value="{{ project_name }}" name="project_name" placeholder="Project Name" required>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label for="collectionName" class="form-label">Collection Name</label>
+                                            <input type="text" class="form-control" id="collectionName" value="{{ collection_name }}" name="collection_name" placeholder="Collection Name" required>
+                                        </div>
+
+                                        <div id="drop-area">
+                                            <p>Drag & Drop<br>
+                                            or<br>
+                                            Click to choose in Files.</p>
+                                            <input type="file" id="fileElem" name="files[]" multiple required style="display:none;">
+                                        </div>
+                                        <ul id="file-list"></ul>
+                                        <input type="hidden" name="selected_files" id="selected-files-input">
+                                        <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+                                        <script src="{% static 'js/homepage.js' %}"></script>
+                                        <button type="submit" name="upload" class="btn btn-primary">Upload Files</button>
+                                        <div class="parser-tooltip-group" style="">
+                                            <span class="tooltip-trigger">
+                                                <a href="{% url 'homepage' %}?reset=1" class="btn btn-secondary text-center" style="text-align: right;"><i class="bi bi-arrow-clockwise"></i></a>
+                                            </span>
+                                            <div class="tooltip-list">
+                                                <p>Resets Card 2 and 3</p>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% if uploaded_files %}
+                <div class="vertical-wrapper">
+                  <hr class="vertical" />
+                </div>
+                <div class="card">
+                  <div class="card-body">
+                    <div class="card-number">2</div>
+                    <h5 class="text-center">Select Parser</h5>
+                    <form method="POST">
+                        {% csrf_token %}
+                        {% for file in uploaded_files %}
+                        <div class="mb-3">
+                            <label class="form-label"><strong>{{ file }}</strong></label>
+                            <span class="badge bg-secondary">Example later dynamic</span>
+                            <select class="form-select" name="parser_type_{{ forloop.counter0 }}" required
+                              title="{{ parser_choices|join:', ' }}">
+                                <option value="">-- Select Parser --</option>
+                                {% for parser in parser_choices %}
+                                    <option value="{{ parser }}">{{ parser }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endfor %}
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                            <div>
+                            {% if parser_assigned %}
+                                <button type="submit" class="btn btn-secondary" disabled>Parse</button>
+                            {% else %}
+                                <button type="submit" name="assign_parsers" class="btn btn-primary">Parse</button>
+                            {% endif %}
+                            </div>
+                            <div class="parser-tooltip-group" style="text-align: right;">
+                              <span class="tooltip-trigger">
+                                <i class="bi bi-info-circle"></i> Available Parsers
+                              </span>
+                              <div class="tooltip-list">
+                                <ul>
+                                  {% for parser in parser_choices %}
+                                    <li>{{ parser }}</li>
+                                  {% endfor %}
+                                </ul>
+                              </div>
+                            </div>
+                        </div>
+                    </form>
+                  </div>
+                </div>
+                {% endif %}
+                {% if logs %}
+                <div class="vertical-wrapper">
+                  <hr class="vertical" />
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-number">3</div>
+                            <div class="tab-content mt-3" id="myTabContent">
+                                <div class="tab-pane fade show active" id="checker-content" role="tabpanel" aria-labelledby="checker-tab">
+                                    <div class="mt-4">
+                                        <h5 class="text-center">Checker Logs</h5>
+                                        <ul class="list-group">
+                                            {% for log in logs %}
+                                            <li class="list-group-item list-group-item-{{ log.level|default:"info" }}">
+                                                <button
+                                                class="btn btn-link d-flex align-items-center w-100 text-decoration-none gap-2"
+                                                type="button"
+                                                data-bs-toggle="collapse"
+                                                data-bs-target="#logCollapse{{ forloop.counter }}"
+                                                aria-expanded="false"
+                                                aria-controls="logCollapse{{ forloop.counter }}">
+
+                                                    <svg class="bi bi-chevron-right transition-arrow" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                                        <path fill-rule="evenodd" d="M6.646 12.854a.5.5 0 0 1 0-.708L10.293 8 6.646 4.354a.5.5 0 1 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708 0z"/>
+                                                    </svg>
+                                                    <div class="collapse-menu-log-text">
+                                                        <strong>[{% if log.level == "danger" %}ERROR{% else %}{{ log.level|upper }}{% endif %}]
+                                                        </strong> {{ log.timestamp }}
+                                                    </div>
+                                                </button>
+                                                <div class="collapse mt-2" id="logCollapse{{ forloop.counter }}">
+                                                    <div>{{ log.event|linebreaksbr }}</div>
+                                                </div>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                    </div>
+                </div>
+                {% elif error %}
+                <div class="col-md-8">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <div class="tab-content mt-3" id="myTabContent">
+                                <div class="tab-pane fade show active" id="checker-content" role="tabpanel" aria-labelledby="checker-tab">
+                                    <div class="mt-4">
+                                            <div class="alert alert-danger mt-3" role="alert">
+                                                {{ error|linebreaks|safe }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+        <script src="{% static 'js/homepage.js' %}"></script>
+    </body>
+    <footer class="text-center py-3 mt-5 border-top">
+        <small>&copy; MIT 2025, BAM Data Store - Data Parser</small>
+    </footer>
+</html>
