@@ -37,7 +37,8 @@ pip install uv
 uv pip install -e '.[dev,parsers]'
 ```
 
-**Note**: The parsers are loaded as entry points via the optional dependencies in the `pyproject.toml` of this repository.
+**Note**: The parsers are loaded as entry points via the optional dependencies in the `pyproject.toml` of this repository. More info under Parsers and Dynamic Plugins.
+
 
 ### Configuration: settings.ini
 
@@ -88,3 +89,17 @@ Quit the server with CONTROL-C.
 ```
 
 Simply click on the localhost address, `http://127.0.0.1:8000/`, to launch the app locally.
+
+# Parsers and Dynamic Plugins
+
+This project discovers parser plugins at runtime using Python entry points.
+
+How it works:
+- The application calls the loader function [`get_entry_point_parsers`](openbis_upload_helper/uploader/entry_points/load.py) which scans the entry point group.
+- Each parser package must expose an entry point  that returns the parser metadata dictionary (name, description, parser_class).
+
+How to make your parser available:
+1. Add the parser to this project's optional dependencies (see [project.optional-dependencies].parsers in pyproject.toml) so CI/devs can install it with
+```sh
+    uv pip install -e .[parsers]
+```
