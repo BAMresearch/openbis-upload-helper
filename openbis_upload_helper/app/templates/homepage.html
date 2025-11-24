@@ -73,6 +73,18 @@
                                                 <p>Resets Card 2 and 3</p>
                                             </div>
                                         </div>
+                                        <div class="parser-tooltip-group card-corner" style="text-align: right;">
+                                             <span class="tooltip-trigger">
+                                               <i class="bi bi-info-circle"></i> Available Parsers
+                                             </span>
+                                             <div class="tooltip-list">
+                                               <ul>
+                                                 {% for parser in parser_choices %}
+                                                   <li>{{ parser }}</li>
+                                                 {% endfor %}
+                                               </ul>
+                                             </div>
+                                       </div>
                                     </form>
                                 </div>
                             </div>
@@ -108,18 +120,6 @@
                             {% else %}
                                 <button type="submit" name="assign_parsers" class="btn btn-primary">Parse</button>
                             {% endif %}
-                            </div>
-                            <div class="parser-tooltip-group" style="text-align: right;">
-                              <span class="tooltip-trigger">
-                                <i class="bi bi-info-circle"></i> Available Parsers
-                              </span>
-                              <div class="tooltip-list">
-                                <ul>
-                                  {% for parser in parser_choices %}
-                                    <li>{{ parser }}</li>
-                                  {% endfor %}
-                                </ul>
-                              </div>
                             </div>
                         </div>
                     </form>

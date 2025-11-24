@@ -5,9 +5,9 @@ import tempfile
 import uuid
 import zipfile
 
-from decouple import config as environ
 from bam_masterdata.cli.cli import run_parser
 from bam_masterdata.logger import logger
+from decouple import config as environ
 from django.conf import settings
 from django.contrib.auth import logout
 from django.core.cache import cache
@@ -46,7 +46,9 @@ def login(request):
                 request.session["openbis_username"] = username or ""
                 request.session["openbis_password"] = encrypted_password
                 request.session["openbis_session_id"] = session_id
-                cache.set(session_id, o, timeout=60 * 60)  # Cache for 1 hour (adjustable)
+                cache.set(
+                    session_id, o, timeout=60 * 60
+                )  # Cache for 1 hour (adjustable)
                 return redirect("homepage")
 
             # fall back to classic username/password login
@@ -89,9 +91,13 @@ def homepage(request):
     for s in o.get_spaces():
         if isinstance(s, dict):
             code = s.get("code") or s.get("identifier") or s.get("name") or str(s)
-            print(code);
         else:
-            code = getattr(s, "code", None) or getattr(s, "identifier", None) or getattr(s, "name", None) or str(s)
+            code = (
+                getattr(s, "code", None)
+                or getattr(s, "identifier", None)
+                or getattr(s, "name", None)
+                or str(s)
+            )
         if code not in filter_list:
             filtered_spaces.append(s)
 
