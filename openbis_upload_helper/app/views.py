@@ -5,6 +5,7 @@ import tempfile
 import uuid
 import zipfile
 
+from decouple import config as environ
 from bam_masterdata.cli.cli import run_parser
 from bam_masterdata.logger import logger
 from django.conf import settings
@@ -31,8 +32,24 @@ def login(request):
     if request.method == "POST":
         username = request.POST.get("username")
         password = request.POST.get("password")
+
+        personal_access_token = request.POST.get("personal_access_token")
         try:
+            # Prefer personal access token when provided
             o = Openbis(settings.OPENBIS_URL)
+            if personal_access_token:
+                # authenticate with PAT
+                o.set_token(personal_access_token, save_token=True)
+                encrypted_password = encrypt_password(personal_access_token)
+                session_id = str(uuid.uuid4())
+                # reuse existing session keys (password holds encrypted secret)
+                request.session["openbis_username"] = username or ""
+                request.session["openbis_password"] = encrypted_password
+                request.session["openbis_session_id"] = session_id
+                cache.set(session_id, o, timeout=60 * 60)  # Cache for 1 hour (adjustable)
+                return redirect("homepage")
+
+            # fall back to classic username/password login
             o.login(username, password, save_token=True)
             encrypted_password = encrypt_password(password)
             session_id = str(uuid.uuid4())
@@ -44,7 +61,7 @@ def login(request):
 
         except Exception as e:
             logger.error(f"Login failed for user '{username}': {e}", exc_info=True)
-            error = "Invalid username or password."
+            error = "Invalid username/password or personal access token."
 
     return render(request, "login.html", {"error": error})
 
@@ -63,8 +80,22 @@ def homepage(request):
         return redirect("login")
     context = {}
     available_parsers, parser_choices = preload_context_request(request, context)
-    # TODO change to only spaces available for the user
-    context["spaces"] = o.get_spaces()
+
+    # load
+    filter_list = environ("SPACE_FILTER", default=["ELN_SETTINGS"])
+
+    # exclude spaces whose code/identifier/name matches an entry in filter_list
+    filtered_spaces = []
+    for s in o.get_spaces():
+        if isinstance(s, dict):
+            code = s.get("code") or s.get("identifier") or s.get("name") or str(s)
+            print(code);
+        else:
+            code = getattr(s, "code", None) or getattr(s, "identifier", None) or getattr(s, "name", None) or str(s)
+        if code not in filter_list:
+            filtered_spaces.append(s)
+
+    context["spaces"] = filtered_spaces
     context["available_parsers"] = available_parsers
 
     # Reset session if requested with button
