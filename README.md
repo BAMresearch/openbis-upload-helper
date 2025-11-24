@@ -37,7 +37,42 @@ pip install uv
 uv pip install -e '.[dev,parsers]'
 ```
 
-**Note**: The parsers are loaded as entry points via the optional dependencies in the `pyproject.toml` of this repository.
+**Note**: The parsers are loaded as entry points via the optional dependencies in the `pyproject.toml` of this repository. More info under Parsers and Dynamic Plugins.
+
+
+### Configuration: settings.ini
+
+A sample settings file is provided at:
+`openbis_upload_helper\uploader\settings.ini.example`
+
+Copy this file to the project root and rename it to **`settings.ini`**. **Do not commit or push this file** to the repository because it contains secrets.
+
+What to set inside
+- **DEBUG**: set to `True` for local **development** so the Django development server will serve static files automatically.
+- **SECRET_KEY**: Django secret key for cryptographic signing.
+- **SECRET_ENCRYPTION_KEY**: application-specific encryption key used by this project.
+- **CSRF_TRUSTED_ORIGINS**: include your local host entries (for example `http://127.0.0.1:8000`). Use full scheme + host entries.
+- **OPENBIS_URL**: openBis instance url for uploading.
+- **SPACE_FILTER**: List of space codes to exclude from display (e.g. ["DEFAULT", "SETTINGS"])
+- **UPLOAD_SIZE_LIMIT**: Maximum total size of the uploaded files in bytes. Example: `UPLOAD_SIZE_LIMIT=10000000000` for 10 GiB. The value must be an integer (bytes).
+- **UPLOAD_TIMEOUT_SECONDS**: Maximum time allowed for the file upload and extraction phase (in seconds). If the loader spends longer than this value while receiving/writing/extracting files, the upload will be aborted. Example: `UPLOAD_TIMEOUT_SECONDS=3000`.
+
+
+Static files note
+- With **DEBUG=True**, the development server serves static files automatically.
+- With **DEBUG=False** you must collect static files and serve them with a proper web server.
+
+Database and admin steps
+- Run migrations before starting the server:
+`python openbis_upload_helper\manage.py migrate`
+
+- If you need the Django admin site, create a superuser after migrating:
+`python openbis_upload_helper\manage.py createsuperuser`
+
+Order recommendation (development)
+1. Copy and configure **`settings.ini`** or **`.env`**.
+2. `python openbis_upload_helper\manage.py migrate`
+3. (Optional) `python openbis_upload_helper\manage.py createsuperuser`
 
 ### Run the app
 
@@ -58,3 +93,17 @@ Quit the server with CONTROL-C.
 ```
 
 Simply click on the localhost address, `http://127.0.0.1:8000/`, to launch the app locally.
+
+# Parsers and Dynamic Plugins
+
+This project discovers parser plugins at runtime using Python entry points.
+
+How it works:
+- The application calls the loader function [`get_entry_point_parsers`](openbis_upload_helper/uploader/entry_points/load.py) which scans the entry point group.
+- Each parser package must expose an entry point  that returns the parser metadata dictionary (name, description, parser_class).
+
+How to make your parser available:
+1. Add the parser to this project's optional dependencies (see [project.optional-dependencies].parsers in pyproject.toml) so CI/devs can install it with
+```sh
+    uv pip install -e .[parsers]
+```

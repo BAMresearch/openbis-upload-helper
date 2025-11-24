@@ -27,7 +27,7 @@ SECRET_KEY = environ("SECRET_KEY")
 # Use the generated key (securely store this key in production, e.g., as an environment variable)
 SECRET_ENCRYPTION_KEY = environ("SECRET_ENCRYPTION_KEY")
 
-OPENBIS_URL = "https://devel.datastore.bam.de/"
+OPENBIS_URL = environ("OPENBIS_URL")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = environ("DEBUG", default=False, cast=bool)
