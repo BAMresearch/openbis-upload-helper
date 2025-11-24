@@ -304,7 +304,9 @@ def reorganize_spaces(spaces: list[str]) -> list[str]:
 
     # 2. VP.x_* spaces, case-insensitive
     vp_pattern = re.compile(r"(?i)(VP\.(\d{1,2}))_", re.IGNORECASE)
-    vp_groups = {}
+
+    # 🔥 Fix for MyPy:
+    vp_groups: dict[str, list[str]] = {}
 
     for s in spaces:
         match = vp_pattern.match(s)
@@ -313,11 +315,11 @@ def reorganize_spaces(spaces: list[str]) -> list[str]:
             vp_groups.setdefault(vp_key, []).append(s)
 
     # Sort by numeric value, not lexicographically (VP.2 < VP.10)
-    def vp_sort_key(vp_key: str):
+    def vp_sort_key(vp_key: str) -> int:
         n = int(vp_key.split(".")[1])
         return n
 
-    vp_spaces = []
+    vp_spaces: list[str] = []
     for vp_key in sorted(vp_groups.keys(), key=vp_sort_key):
         vp_spaces.extend(sorted(vp_groups[vp_key]))
 
