@@ -20,9 +20,11 @@ from .utils import (
     FileRemover,
     FilesParser,
     encrypt_password,
+    extract_name,
     get_openbis_from_cache,
     log_results,
     preload_context_request,
+    reorganize_spaces,
 )
 
 
@@ -89,20 +91,53 @@ def homepage(request):
     # exclude spaces whose code/identifier/name matches an entry in filter_list
     filtered_spaces = []
     for s in o.get_spaces():
-        if isinstance(s, dict):
-            code = s.get("code") or s.get("identifier") or s.get("name") or str(s)
-        else:
-            code = (
-                getattr(s, "code", None)
-                or getattr(s, "identifier", None)
-                or getattr(s, "name", None)
-                or str(s)
-            )
+        code = extract_name(s)
         if code not in filter_list:
-            filtered_spaces.append(s)
+            filtered_spaces.append(code)
+    filtered_spaces = reorganize_spaces(filtered_spaces)
 
     context["spaces"] = filtered_spaces
     context["available_parsers"] = available_parsers
+
+    # selected_space default
+    selected_space = None
+    projects = []
+    collections = []
+
+    # Get to filter after space selection
+    if request.method == "GET" and request.GET.get("space_select"):
+        selected_space = request.GET.get("space")
+        if selected_space:
+            try:
+                projects_raw = o.get_projects(space=selected_space)
+            except TypeError:
+                projects_raw = o.get_projects()
+            try:
+                collections_raw = o.get_experiments(space=selected_space)
+            except TypeError:
+                collections_raw = o.get_experiments()
+
+            # Filter
+            try:
+                projects = [extract_name(p) for p in projects_raw]
+            except Exception:
+                projects = [extract_name(p) for p in projects_raw]
+
+            try:
+                collections = [extract_name(c) for c in collections_raw]
+            except Exception:
+                collections = [extract_name(c) for c in collections_raw]
+
+            # context["projects"] = projects
+            # context["collections"] = collections
+
+    else:
+        projects = []
+        collections = []
+
+    context["selected_space"] = selected_space
+    context["projects"] = projects
+    context["collections"] = collections
 
     # Reset session if requested with button
     if request.method == "GET" and "reset" in request.GET:
@@ -181,8 +216,7 @@ def homepage(request):
             context["error"] = str(e)
             return render(request, "homepage.html", context)
 
-    # GET request
-    # for card 1 forms
+    # GET request (restored session values for forms)
     context["project_name"] = request.session.get("project_name", "")
     context["collection_name"] = request.session.get("collection_name", "")
     # for card 3/2
