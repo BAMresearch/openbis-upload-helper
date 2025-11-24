@@ -53,6 +53,7 @@ What to set inside
 - **SECRET_ENCRYPTION_KEY**: application-specific encryption key used by this project.
 - **CSRF_TRUSTED_ORIGINS**: include your local host entries (for example `http://127.0.0.1:8000`). Use full scheme + host entries.
 - **OPENBIS_URL**: openBis instance url for uploading.
+- **SPACE_FILTER**: List of space codes to exclude from display (e.g. ["DEFAULT", "SETTINGS"])
 
 Static files note
 - With **DEBUG=True**, the development server serves static files automatically.
