@@ -54,6 +54,9 @@ What to set inside
 - **CSRF_TRUSTED_ORIGINS**: include your local host entries (for example `http://127.0.0.1:8000`). Use full scheme + host entries.
 - **OPENBIS_URL**: openBis instance url for uploading.
 - **SPACE_FILTER**: List of space codes to exclude from display (e.g. ["DEFAULT", "SETTINGS"])
+- **UPLOAD_SIZE_LIMIT**: Maximum total size of the uploaded files in bytes. Example: `UPLOAD_SIZE_LIMIT=10000000000` for 10 GiB. The value must be an integer (bytes).
+- **UPLOAD_TIMEOUT_SECONDS**: Maximum time allowed for the file upload and extraction phase (in seconds). If the loader spends longer than this value while receiving/writing/extracting files, the upload will be aborted. Example: `UPLOAD_TIMEOUT_SECONDS=3000`.
+
 
 Static files note
 - With **DEBUG=True**, the development server serves static files automatically.
