@@ -199,9 +199,6 @@ def homepage(request):
                 collection_name=request.session.get("collection_name", ""),
                 space_name=request.session.get("selected_space"),
             )
-            # remove temporary directories
-            file_remover = FileRemover(uploaded_files)
-            file_remover.cleanup()
 
             # save Logs
             context_logs = log_results(request, parsed_files, context)
@@ -216,7 +213,13 @@ def homepage(request):
             context["error"] = str(e)
             return render(request, "homepage.html", context)
 
-    # GET request (restored session values for forms)
+        finally:
+            # remove temporary directories
+            file_remover = FileRemover(uploaded_files)
+            file_remover.cleanup()
+
+    # GET request
+    # for card 1 forms
     context["project_name"] = request.session.get("project_name", "")
     context["collection_name"] = request.session.get("collection_name", "")
     # for card 3/2
