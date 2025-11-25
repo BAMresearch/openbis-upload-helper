@@ -111,9 +111,9 @@ class FileLoader:
         file_sizes = 0
         for uploaded_file in self.uploaded_files:
             file_sizes += uploaded_file.size
-            if self.size_limit and file_sizes > int(self.size_limit):
+            if self.size_limit and file_sizes > int(float(self.size_limit)):
                 raise ValueError(
-                    f"Uploaded files exceed the size limit of {self.size_limit} bytes."
+                    f"Uploaded files exceed the size limit of {int(float(self.size_limit))} bytes."
                 )
 
         for uploaded_file in self.uploaded_files:
