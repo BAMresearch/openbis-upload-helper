@@ -52,7 +52,7 @@ What to set inside
 - **SECRET_KEY**: Django secret key for cryptographic signing.
 - **SECRET_ENCRYPTION_KEY**: application-specific encryption key used by this project.
 - **CSRF_TRUSTED_ORIGINS**: include your local host entries (for example `http://127.0.0.1:8000`). Use full scheme + host entries.
-- **OPENBIS_URL**: openBis instance url for uploading.
+- **OPENBIS_URL**: openBIS instance URL for uploading the data.
 - **SPACE_FILTER**: List of space codes to exclude from display (e.g. ["DEFAULT", "SETTINGS"])
 - **UPLOAD_SIZE_LIMIT**: Maximum total size of the uploaded files in bytes. Example: `UPLOAD_SIZE_LIMIT=10000000000` for 10 GiB. The value must be an integer (bytes).
 - **UPLOAD_TIMEOUT_SECONDS**: Maximum time allowed for the file upload and extraction phase (in seconds). If the loader spends longer than this value while receiving/writing/extracting files, the upload will be aborted. Example: `UPLOAD_TIMEOUT_SECONDS=3000`.
@@ -98,12 +98,20 @@ Simply click on the localhost address, `http://127.0.0.1:8000/`, to launch the a
 
 This project discovers parser plugins at runtime using Python entry points.
 
-How it works:
-- The application calls the loader function [`get_entry_point_parsers`](openbis_upload_helper/uploader/entry_points/load.py) which scans the entry point group.
-- Each parser package must expose an entry point  that returns the parser metadata dictionary (name, description, parser_class).
+## How it works
 
-How to make your parser available:
-1. Add the parser to this project's optional dependencies (see [project.optional-dependencies].parsers in pyproject.toml) so CI/devs can install it with
-```sh
-    uv pip install -e .[parsers]
-```
+1. **Include the parser dependency**
+
+   Add the parser to your `pyproject.toml` under `[project.optional-dependencies]` in the `parsers` section.
+
+2. **Install the parser**
+
+   After adding the dependency, install it with:
+
+   ```sh
+   uv pip install -e .[parsers]
+    ```
+3. **Load the parser at runtime**
+
+    The application uses the loader function [get_entry_point_parsers]
+    It scans the configured entry point group and returns the available parser plugins dynamically.
