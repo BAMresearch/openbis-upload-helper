@@ -7,7 +7,10 @@ import tempfile
 import time
 import uuid
 import zipfile
+from concurrent.futures import TimeoutError
 
+import multiprocess as mp
+from bam_masterdata.cli.cli import run_parser
 from bam_masterdata.logger import log_storage, logger
 from cryptography.fernet import Fernet, InvalidToken
 from decouple import config as environ
@@ -328,3 +331,67 @@ def reorganize_spaces(spaces: list[str]) -> list[str]:
     )
 
     return bam_spaces + vp_spaces + others
+
+
+def process_run_parser(
+    openbis,
+    files_parser,
+    project_name,
+    collection_name,
+    space_name,
+    logger,
+):
+    """This Function starts the parser in a separate process with a timeout.
+
+    Args:
+        openbis: token to openbis
+        files_parser (Tupel): Tupel of parser and files to parse
+        project_name (str): Name of the project
+        collection_name (str): Name of the collection
+        space_name (str): Name of the space
+        logger ():
+    """
+
+    def _task(queue):
+        """This function runs the parser and puts the result in a queue.
+
+        Args:
+            queue (Process): Queue to put the result in.
+        """
+        queue.put("__started__")  # Marker für "Worker hat begonnen"
+        try:
+            o = Openbis(environ("OPENBIS_URL"))
+            o.set_token(openbis)
+            run_parser(
+                openbis=o,
+                files_parser=files_parser,
+                project_name=project_name,
+                collection_name=collection_name,
+                space_name=space_name,
+            )
+            queue.put({"status": "ok"})
+        except Exception as e:
+            queue.put({"status": "error", "exception": str(e)})
+
+    timeout = int(float(environ("PROCESSING_TIMEOUT_SECONDS", 300)))
+    result_queue = mp.Queue()
+    p = mp.Process(target=_task, args=(result_queue,))
+    p.start()
+    p.join(timeout)
+
+    if p.is_alive():
+        p.terminate()
+        p.join()
+        raise TimeoutError("Parser Task timed out")
+
+    try:
+        print("getting result")
+        result = result_queue.get_nowait()
+        print("result:", result)
+    except mp.queues.Empty:
+        raise RuntimeError("Unknown error in parser process")
+
+    if isinstance(result, Exception):
+        raise result
+
+    logger.info("Parser Task completed successfully")

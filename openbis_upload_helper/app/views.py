@@ -5,7 +5,6 @@ import tempfile
 import uuid
 import zipfile
 
-from bam_masterdata.cli.cli import run_parser
 from bam_masterdata.logger import logger
 from decouple import config as environ
 from django.conf import settings
@@ -24,6 +23,7 @@ from .utils import (
     get_openbis_from_cache,
     log_results,
     preload_context_request,
+    process_run_parser,
     reorganize_spaces,
 )
 
@@ -191,13 +191,14 @@ def homepage(request):
         try:
             files_parser_class = FilesParser(uploaded_files, available_parsers, o)
             parsed_files, files_parser = files_parser_class.assign_parsers(request)
-
-            run_parser(
-                openbis=o,
+            token = o.token
+            process_run_parser(
+                openbis=token,
                 files_parser=files_parser,
                 project_name=request.session.get("project_name", ""),
                 collection_name=request.session.get("collection_name", ""),
                 space_name=request.session.get("selected_space"),
+                logger=logger,
             )
 
             # save Logs
