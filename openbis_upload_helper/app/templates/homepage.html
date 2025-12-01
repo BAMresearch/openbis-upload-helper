@@ -26,7 +26,6 @@
                             <div class="tab-content mt-3" id="myTabContent">
                                 <div class="tab-pane fade show active" id="checker-content" role="tabpanel" aria-labelledby="checker-tab">
                                     <h5 class="text-center">Export Options</h5>
-
                                     <!--GET-Form Space-->
                                     <form method="get" action="{% url 'homepage' %}" class="mb-3 d-flex align-items-end gap-2">
                                         <input type="hidden" name="space_select" value="1">
@@ -47,7 +46,6 @@
                                                 <div class="text-danger mt-2">No spaces are available for selection. Please contact your administrator.</div>
                                             {% endif %}
                                         </div>
-
                                         <!-- Fallback without JS: Load-Button -->
                                         <noscript>
                                             <div>
@@ -55,7 +53,6 @@
                                             </div>
                                         </noscript>
                                     </form>
-
                                     <form id="upload-form" method="POST" enctype="multipart/form-data">
                                         {% csrf_token %}
                                         {% if selected_space %}
@@ -73,7 +70,6 @@
                                                 {% endif %}
                                             </datalist>
                                         </div>
-
                                         <div class="mb-3">
                                             <label for="collectionName" class="form-label">Collection Name</label>
                                             <input type="text" class="form-control" id="collectionName" value="{{ collection_name }}" name="collection_name" placeholder="Collection Name" list="collections-list">
@@ -85,7 +81,6 @@
                                                 {% endif %}
                                             </datalist>
                                         </div>
-
                                         <div id="drop-area">
                                             <p>Drag & Drop<br>
                                             or<br>

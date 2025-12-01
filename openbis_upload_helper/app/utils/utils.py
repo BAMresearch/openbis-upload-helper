@@ -305,7 +305,6 @@ def reorganize_spaces(spaces: list[str]) -> list[str]:
     # 2. VP.x_* spaces, case-insensitive
     vp_pattern = re.compile(r"(?i)(VP\.(\d{1,2}))_", re.IGNORECASE)
 
-    # 🔥 Fix for MyPy:
     vp_groups: dict[str, list[str]] = {}
 
     for s in spaces:
