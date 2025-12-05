@@ -91,16 +91,6 @@ class FileLoader:
         self.temp_dirs = []  # List to keep track of temporary directories
         self.size_limit = environ("UPLOAD_SIZE_LIMIT", default=None)
         # timeout in seconds (default 300)
-        self.timeout_seconds = environ("UPLOAD_TIMEOUT_SECONDS", default=300)
-        self.start_time = None
-
-    def _check_timeout(self):
-        if self.start_time is None:
-            return
-        if (time.time() - self.start_time) > int(self.timeout_seconds):
-            raise TimeoutError(
-                f"Upload exceeded timeout of {self.timeout_seconds} seconds."
-            )
 
     def load_files(self):
         if not self.uploaded_files:
@@ -117,9 +107,6 @@ class FileLoader:
                 )
 
         for uploaded_file in self.uploaded_files:
-            # check timeout between files
-            self._check_timeout()
-
             if uploaded_file.name.endswith(".zip"):
                 self._process_zip(uploaded_file)
             elif uploaded_file.name.endswith((".tar", ".tar.gz", ".tar.z")):
@@ -138,7 +125,6 @@ class FileLoader:
         with open(zip_path, "wb") as f:
             for chunk in uploaded_file.chunks():
                 f.write(chunk)
-                self._check_timeout()
 
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             for zip_info in zip_ref.infolist():
@@ -155,7 +141,6 @@ class FileLoader:
                             if not chunk:
                                 break
                             out_file.write(chunk)
-                            self._check_timeout()
                     if zip_info.filename in self.selected_files:
                         self.saved_file_names.append((zip_info.filename, target_path))
 
@@ -166,7 +151,6 @@ class FileLoader:
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_tar:
                 for chunk in uploaded_file.chunks():
                     tmp_tar.write(chunk)
-                    self._check_timeout()
                 tmp_tar_path = tmp_tar.name
 
             tmp_dir = tempfile.mkdtemp()
@@ -183,7 +167,6 @@ class FileLoader:
                                     if not chunk:
                                         break
                                     out_file.write(chunk)
-                                    self._check_timeout()
                             if member.name in self.selected_files:
                                 self.saved_file_names.append((member.name, target_path))
 
@@ -198,7 +181,6 @@ class FileLoader:
         with open(target_path, "wb") as f:
             for chunk in uploaded_file.chunks():
                 f.write(chunk)
-                self._check_timeout()
         if uploaded_file.name in self.selected_files:
             self.saved_file_names.append((uploaded_file.name, target_path))
 
