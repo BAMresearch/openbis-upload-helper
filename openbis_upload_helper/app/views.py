@@ -1,28 +1,22 @@
-import datetime
-import os
-import tarfile
-import tempfile
 import uuid
-import zipfile
 
 from bam_masterdata.cli.cli import run_parser
 from bam_masterdata.logger import logger
 from django.conf import settings
 from django.contrib.auth import logout
 from django.core.cache import cache
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect
+from django.shortcuts import render
 from django.views.decorators.http import require_POST
 from pybis import Openbis
 
-from .utils import (
-    FileLoader,
-    FileRemover,
-    FilesParser,
-    encrypt_password,
-    get_openbis_from_cache,
-    log_results,
-    preload_context_request,
-)
+from .utils import FileLoader
+from .utils import FileRemover
+from .utils import FilesParser
+from .utils import encrypt_password
+from .utils import get_openbis_from_cache
+from .utils import log_results
+from .utils import preload_context_request
 
 
 def login(request):
