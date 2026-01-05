@@ -1,62 +1,63 @@
-[build-system]
-requires = ["setuptools>=61.0.0", "setuptools-scm>=8.0"]
-build-backend = "setuptools.build_meta"
-
-[project]
-classifiers = [
-  "Natural Language :: English",
-  "Intended Audience :: Science/Research",
-  "Operating System :: OS Independent",
-  "Programming Language :: Python",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-]
-name = "openbis-upload-helper"
-description = "An upload helper app for OpenBIS."
-dynamic = ["version"]
-readme = "README.md"
-requires-python = ">=3.10"
-authors = [
-  { name = "Bastian Rühle", email = "bastian.ruehle@bam.de" },
-  { name = "Ingo Breßler", email = "ingo.bressler@bam.de" },
-  { name = "Jose M. Pizarro", email = "jose.pizarro-blanco@bam.de" },
-]
-maintainers = [
-  { name = "Bastian Rühle", email = "bastian.ruehle@bam.de" },
-  { name = "Ingo Breßler", email = "ingo.bressler@bam.de" },
-  { name = "Jose M. Pizarro", email = "jose.pizarro-blanco@bam.de" },
-]
-license = { file = "LICENSE" }
-dependencies = [
-  "bam-masterdata>=0.6.3",
-  "django",
-  "whitenoise",
-  "pybis~=1.37.1rc4",
-  "cryptography>=45.0.2",
-  "python-decouple",
+# ==== pytest ====
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "--ds=config.settings.test --reuse-db --import-mode=importlib"
+python_files = [
+    "tests.py",
+    "test_*.py",
 ]
 
-[project.urls]
-"Homepage" = "https://github.com/BAMresearch/openbis-upload-helper"
-"Bug Tracker" = "https://github.com/BAMresearch/openbis-upload-helper/issues"
+# ==== Coverage ====
+[tool.coverage.run]
+include = ["openbis_upload_helper/**"]
+omit = ["*/migrations/*", "*/tests/*"]
+plugins = ["django_coverage_plugin"]
 
-[project.optional-dependencies]
-dev = [
-  "mypy==1.0.1",
-  "ruff==0.11.4",
-  "pytest",
-  "pytest-timeout",
-  "pytest-cov",
-  "structlog==24.4.0",
+# ==== mypy ====
+[tool.mypy]
+python_version = "3.13"
+check_untyped_defs = true
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+plugins = [
+    "mypy_django_plugin.main",
 ]
-parsers = [
-  "masterdata-parser-example@git+https://github.com/BAMresearch/masterdata-parser-example.git@main",
-  "sigmabam2openbis@git+https://github.com/BAMresearch/sigmabam2openbis.git@main",
-]
+
+[[tool.mypy.overrides]]
+# Django migrations should not produce any errors:
+module = "*.migrations.*"
+ignore_errors = true
+
+[tool.django-stubs]
+django_settings_module = "config.settings.test"
+
+# ==== djLint ====
+[tool.djlint]
+blank_line_after_tag = "load,extends"
+close_void_tags = true
+format_css = true
+format_js = true
+# TODO: remove T002 when fixed https://github.com/djlint/djLint/issues/687
+ignore = "H006,H030,H031,T002"
+include = "H017,H035"
+indent = 2
+max_line_length = 119
+profile = "django"
+
+[tool.djlint.css]
+indent_size = 2
+
+[tool.djlint.js]
+indent_size = 2
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
+extend-exclude = [
+    "*/migrations/*.py",
+    "staticfiles/*",
+]
 include = ["openbis_upload_helper/*.py", "tests/*.py"]
 exclude = [
     ".bzr",
@@ -88,32 +89,156 @@ indent-width = 4
 
 [tool.ruff.lint]
 select = [
-    "E", # pycodestyle
-    "PL", # pylint
-    "F", # Pyflakes
-    "UP", # pyupgrade
-    "I", # isort
+    "F",
+    "E",
+    "W",
+    "C90",
+    "I",
+    "N",
+    "UP",
+    "YTT",
+    # "ANN", # flake8-annotations: we should support this in the future but 100+ errors atm
+    "ASYNC",
+    "S",
+    "BLE",
+    "FBT",
+    "B",
+    "A",
+    "COM",
+    "C4",
+    "DTZ",
+    "T10",
+    "DJ",
+    "EM",
+    "EXE",
+    "FA",
+    'ISC',
+    "ICN",
+    "G",
+    'INP',
+    'PIE',
+    "T20",
+    'PYI',
+    'PT',
+    "Q",
+    "RSE",
+    "RET",
+    "SLF",
+    "SLOT",
+    "SIM",
+    "TID",
+    "TC",
+    "INT",
+    # "ARG", # Unused function argument
+    "PTH",
+    "ERA",
+    "PD",
+    "PGH",
+    "PL",
+    "TRY",
+    "FLY",
+    # "NPY",
+    # "AIR",
+    "PERF",
+    # "FURB",
+    # "LOG",
+    "RUF",
 ]
 ignore = [
-    "F401", # Module imported but unused
-    "E501", # Line too long ({width} > {limit} characters)
-    "E701", # Multiple statements on one line (colon)
-    "E731", # Do not assign a lambda expression, use a def
-    "E402",  # Module level import not at top of file
-    "PLR0911", # Too many return statements
-    "PLR0912", # Too many branches
-    "PLR0913", # Too many arguments in function definition
-    "PLR0915", # Too many statements
-    "PLR2004", # Magic value used instead of constant
-    "PLW0603", # Using the global statement
-    "PLW2901", # redefined-loop-name
-    "PLR1714", # consider-using-in
-    "PLR5501", # else-if-used
+    "S101", # Use of assert detected https://docs.astral.sh/ruff/rules/assert/
+    "RUF012", # Mutable class attributes should be annotated with `typing.ClassVar`
+    "SIM102", # sometimes it's better to nest
+    # of types for comparison.
+    # Deactivated because it can make the code slow:
+    # https://github.com/astral-sh/ruff/issues/7871
 ]
 fixable = ["ALL"]
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-# this is entirely optional, you can remove this if you wish to
+
+[tool.ruff.lint.isort]
+force-single-line = true
+
+[dependency-groups]
+dev = [
+    "coverage==7.13.0",
+    "django-coverage-plugin==3.2.0",
+    "django-debug-toolbar==6.1.0",
+    "django-extensions==4.1",
+    "django-stubs[compatible-mypy]==5.2.8",
+    "djlint==1.36.4",
+    "factory-boy==3.3.2",
+    "ipdb==0.13.13",
+    "mypy==1.19.1",
+    "pre-commit==4.5.1",
+    "psycopg[binary]==3.3.2",
+    "pytest==9.0.2",
+    "pytest-django==4.11.1",
+    "pytest-sugar==1.1.1",
+    "ruff==0.14.10",
+    "sphinx==9.0.4",
+    "sphinx-autobuild==2025.8.25",
+    "watchfiles==1.1.1",
+    "werkzeug[watchdog]==3.1.4",
+]
+
+[project]
+name = "openbis_upload_helper"
+version = "0.1.0"
+description = "The openBIS Upload Helper is a tool to parse files and extract their relevant metadata into objects and vocabularies in openBIS."
+readme = "README.md"
+
+license = { text = "Not open source" }
+authors = [
+  { name = "Jose M. Pizarro", email = "jose.pizarro-blanco@bam.de" },
+]
+requires-python = "==3.13.*"
+dependencies = [
+    "argon2-cffi==25.1.0",
+    "celery==5.6.0",
+    "crispy-bootstrap5==2025.6",
+    "django==5.2.9",
+    "django-allauth[mfa]==65.13.1",
+    "django-anymail[mailgun]==14.0",
+    "django-celery-beat==2.8.1",
+    "django-crispy-forms==2.5",
+    "django-environ==0.12.0",
+    "django-model-utils==5.0.0",
+    "django-redis==6.0.0",
+    "gunicorn==23.0.0",
+    "hiredis==3.3.0",
+    "pillow==12.0.0",
+    "psycopg[binary]==3.3.2",
+    "python-slugify==8.0.4",
+    "redis==7.1.0",
+    "sentry-sdk==2.48.0",
+    "uvicorn-worker==0.4.0",
+    "uvicorn[standard]==0.38.0",
+    "whitenoise==6.11.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0.0", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+[project.urls]
+"Homepage" = "https://github.com/BAMresearch/openbis-upload-helper"
+"Bug Tracker" = "https://github.com/BAMresearch/openbis-upload-helper/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-timeout",
+    "pytest-cov",
+    "structlog==24.4.0",
+]
+parsers = [
+    "masterdata-parser-example@git+https://github.com/BAMresearch/masterdata-parser-example.git@main",
+]
+
+# "sigmabam2openbis@git+https://github.com/BAMresearch/sigmabam2openbis.git@main"
+
+
 [tool.ruff.format]
 # use double quotes for strings.
 quote-style = "double"
@@ -123,13 +248,6 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 # Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
-
-[tool.mypy]
-strict = false
-ignore_missing_imports = true
-follow_imports = "silent"
-no_strict_optional = true
-disable_error_code = "import, annotation-unchecked"
 
 [tool.setuptools.packages.find]
 where = ["."]
