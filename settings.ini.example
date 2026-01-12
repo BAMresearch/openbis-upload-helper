@@ -1,0 +1,162 @@
+; ============================================================================
+; SETTINGS OVERVIEW (Documentation only – NOT parsed by Django)
+; ============================================================================
+; This project follows 12-Factor App principles using Cookiecutter Django.
+;
+; RULE:
+; - All values are changed via environment variables
+; - Environment variables live in:
+;
+;   .envs/
+;   ├── .local/
+;   │   ├── .django        <-- change local Django settings HERE
+;   │   └── .postgres
+;   ├── .production/
+;   │   ├── .django        <-- change production Django settings HERE
+;   │   └── .postgres
+;
+; - Python settings only READ env vars:
+;
+;   config/settings/
+;   ├── base.py
+;   ├── local.py
+;   └── production.py
+;
+; DO NOT put logic or defaults in .env files.
+; ============================================================================
+
+
+[general]
+; ---------------------------------------------------------------------------
+; Where to change:
+;   .envs/.local/.django
+;   .envs/.production/.django
+; ---------------------------------------------------------------------------
+
+DEBUG=True                  ; local.py (default True), production.py (forced False)
+PORT=8000                   ; Docker / runserver port binding
+LOG_LEVEL=DEBUG              ; Logging verbosity
+
+
+[security]
+; ---------------------------------------------------------------------------
+; Where to change:
+;   .envs/*/.django
+; Required in ALL environments
+; ---------------------------------------------------------------------------
+
+SECRET_KEY=django-insecure-CHANGE-ME
+SECRET_ENCRYPTION_KEY=CHANGE-ME
+
+ALLOWED_HOSTS=127.0.0.1,localhost
+CSRF_TRUSTED_ORIGINS=https://www.example.de
+
+
+[application]
+; ---------------------------------------------------------------------------
+; App-specific configuration
+; Where to change:
+;   .envs/*/.django
+; ---------------------------------------------------------------------------
+
+OPENBIS_URL=https://www.example.de
+SPACE_FILTER=["DEFAULT","STORAGE"]
+
+UPLOAD_SIZE_LIMIT=10000000000
+UPLOAD_TIMEOUT_SECONDS=3000
+PROCESSING_TIMEOUT_SECONDS=300
+
+
+[backing-services]
+; ---------------------------------------------------------------------------
+; 12-Factor #4: Backing Services
+; Where to change:
+;   .envs/*/.django
+; ---------------------------------------------------------------------------
+
+DATABASE_URL=postgres://user:password@host:5432/dbname
+REDIS_URL=redis://redis:6379/0
+
+
+[email]
+; ---------------------------------------------------------------------------
+; Email service configuration
+; Where to change:
+;   .envs/*/.django
+; ---------------------------------------------------------------------------
+
+EMAIL_HOST=smtp.example.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=user@example.com
+EMAIL_HOST_PASSWORD=CHANGE-ME
+EMAIL_USE_TLS=True
+EMAIL_USE_SSL=False
+
+
+[concurrency]
+; ---------------------------------------------------------------------------
+; Scaling & worker configuration
+; Currently relevant mainly for Docker / Celery
+; Where to change:
+;   .envs/*/.django
+; ---------------------------------------------------------------------------
+
+MAX_WORKERS=1
+
+
+[lifecycle]
+; ---------------------------------------------------------------------------
+; App startup / shutdown behavior
+; Where to change:
+;   .envs/*/.django
+; ---------------------------------------------------------------------------
+
+WAIT_FOR_GRACEFUL_SHUTDOWN=True
+
+
+[12-factor-notes]
+; ---------------------------------------------------------------------------
+; 12-Factor reference notes (documentation only)
+; ---------------------------------------------------------------------------
+
+; 1. Codebase
+;    - Single codebase tracked in Git
+;    - Local install:
+;      uv pip install -e ".[dev,parsers]"
+
+; 2. Dependencies
+;    - Managed via pyproject.toml
+;    - requirements.txt may be added later
+
+; 3. Config
+;    - All config via environment variables ✔
+
+; 4. Backing services
+;    - Database, Redis, Email via URLs ✔
+
+; 5. Build, release, run
+;    - Build: image
+;    - Release: env vars
+;    - Run: Django / Gunicorn
+
+; 6. Processes
+;    - Stateless Django processes
+;    - Celery planned
+
+; 7. Port binding
+;    - PORT env var ✔
+
+; 8. Concurrency
+;    - Horizontal scaling via workers
+
+; 9. Disposability
+;    - Fast startup & graceful shutdown via Docker
+
+; 10. Dev/prod parity
+;     - Same services, different env vars
+
+; 11. Logs
+;     - Logs to stdout/stderr
+
+; 12. Admin processes
+;     - Django management commands
