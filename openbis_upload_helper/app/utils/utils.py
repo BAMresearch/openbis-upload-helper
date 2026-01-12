@@ -1,13 +1,18 @@
 import datetime
 import os
+import re
 import shutil
 import tarfile
 import tempfile
+import time
 import uuid
 import zipfile
 
-from bam_masterdata.logger import log_storage, logger
-from cryptography.fernet import Fernet, InvalidToken
+from bam_masterdata.logger import log_storage
+from bam_masterdata.logger import logger
+from cryptography.fernet import Fernet
+from cryptography.fernet import InvalidToken
+from decouple import config as environ
 from django.conf import settings
 from django.core.cache import cache
 from pybis import Openbis
@@ -30,10 +35,10 @@ def decrypt_password(encrypted_password):
         decrypted_password = cipher_suite.decrypt(encrypted_password.encode("utf-8"))
         return decrypted_password.decode("utf-8")
     except InvalidToken as e:
-        logger.error(f"Decryption failed: {str(e)}")
+        logger.error(f"Decryption failed: {e!s}")
         raise InvalidToken("Decryption failed due to an invalid token.")
     except Exception as e:
-        logger.error(f"Decryption error: {str(e)}")
+        logger.error(f"Decryption error: {e!s}")
         raise e
 
 
@@ -86,10 +91,22 @@ class FileLoader:
         self.selected_files = selected_files
         self.saved_file_names = []
         self.temp_dirs = []  # List to keep track of temporary directories
+        self.size_limit = environ("UPLOAD_SIZE_LIMIT", default=None)
+        # timeout in seconds (default 300)
 
     def load_files(self):
         if not self.uploaded_files:
             raise ValueError("No files uploaded.")
+        # start countdown
+        self.start_time = time.time()
+
+        file_sizes = 0
+        for uploaded_file in self.uploaded_files:
+            file_sizes += uploaded_file.size
+            if self.size_limit and file_sizes > int(float(self.size_limit)):
+                raise ValueError(
+                    f"Uploaded files exceed the size limit of {int(float(self.size_limit))} bytes.",
+                )
 
         for uploaded_file in self.uploaded_files:
             if uploaded_file.name.endswith(".zip"):
@@ -99,10 +116,9 @@ class FileLoader:
             else:
                 self._process_regular_file(uploaded_file)
 
-        if self.saved_file_names:
-            return self.saved_file_names
-        else:
-            raise ValueError("No files uploaded.")
+        if not self.saved_file_names:
+            raise ValueError("No files were saved. Processing may have failed.")
+        return self.saved_file_names
 
     def _process_zip(self, uploaded_file):
         tmp_dir = tempfile.mkdtemp()
@@ -117,8 +133,16 @@ class FileLoader:
                 if not zip_info.is_dir():
                     target_path = os.path.join(tmp_dir, zip_info.filename)
                     os.makedirs(os.path.dirname(target_path), exist_ok=True)
-                    with open(target_path, "wb") as out_file:
-                        out_file.write(zip_ref.read(zip_info.filename))
+                    # read zip member in chunks to allow timeout checks
+                    with (
+                        zip_ref.open(zip_info) as src,
+                        open(target_path, "wb") as out_file,
+                    ):
+                        while True:
+                            chunk = src.read(8192)
+                            if not chunk:
+                                break
+                            out_file.write(chunk)
                     if zip_info.filename in self.selected_files:
                         self.saved_file_names.append((zip_info.filename, target_path))
 
@@ -140,7 +164,11 @@ class FileLoader:
                             target_path = os.path.join(tmp_dir, member.name)
                             os.makedirs(os.path.dirname(target_path), exist_ok=True)
                             with open(target_path, "wb") as out_file:
-                                out_file.write(extracted_file.read())
+                                while True:
+                                    chunk = extracted_file.read(8192)
+                                    if not chunk:
+                                        break
+                                    out_file.write(chunk)
                             if member.name in self.selected_files:
                                 self.saved_file_names.append((member.name, target_path))
 
@@ -157,6 +185,10 @@ class FileLoader:
                 f.write(chunk)
         if uploaded_file.name in self.selected_files:
             self.saved_file_names.append((uploaded_file.name, target_path))
+
+    def antivirus_scan(self):
+        # Placeholder for antivirus scanning logic
+        pass
 
 
 class FilesParser:
@@ -208,7 +240,7 @@ def log_results(request, parsed_files={}, context={}):
                     "event": f"[{parser}] Parsed: {os.path.basename(path)}",
                     "timestamp": datetime.datetime.now().isoformat(),
                     "level": "info",
-                }
+                },
             )
     # format logs
     context_logs = []
@@ -216,15 +248,67 @@ def log_results(request, parsed_files={}, context={}):
         if log.get("level") == "debug":
             continue
         log["timestamp"] = datetime.datetime.fromisoformat(
-            log["timestamp"].replace("Z", "+00:00")
+            log["timestamp"].replace("Z", "+00:00"),
         ).strftime("%H:%M:%S, %d.%m.%Y")
         context_logs.append(
             {
                 "event": log["event"],
                 "timestamp": log["timestamp"],
                 "level": "danger" if log["level"] == "error" else log["level"],
-            }
+            },
         )
     context["logs"] = context_logs
     request.session["checker_logs"] = context_logs
     return context_logs
+
+
+def extract_name(obj):
+    if isinstance(obj, dict):
+        return obj.get("code") or obj.get("identifier") or obj.get("name") or str(obj)
+    return (
+        getattr(obj, "code", None)
+        or getattr(obj, "identifier", None)
+        or getattr(obj, "name", None)
+        or str(obj)
+    )
+
+
+def reorganize_spaces(spaces: list[str]) -> list[str]:
+    """
+    Reorganizes a list of space names so that:
+    - BAM_* spaces appear first
+    - VP.x_* and VP.xx_* spaces follow (case-insensitive)
+    - all other spaces come last
+    Pattern examples:
+      VP.1_NAME, Vp.01_TEST, vp.12_ABC
+    """
+
+    # 1. BAM_* spaces (case-sensitive as original)
+    bam_spaces = sorted([s for s in spaces if s.startswith("BAM_")])
+
+    # 2. VP.x_* spaces, case-insensitive
+    vp_pattern = re.compile(r"(?i)(VP\.(\d{1,2}))_", re.IGNORECASE)
+
+    vp_groups: dict[str, list[str]] = {}
+
+    for s in spaces:
+        match = vp_pattern.match(s)
+        if match:
+            vp_key = match.group(1).upper()  # normalize e.g. VP.1 → VP.1, vp.01 → VP.01
+            vp_groups.setdefault(vp_key, []).append(s)
+
+    # Sort by numeric value, not lexicographically (VP.2 < VP.10)
+    def vp_sort_key(vp_key: str) -> int:
+        n = int(vp_key.split(".")[1])
+        return n
+
+    vp_spaces: list[str] = []
+    for vp_key in sorted(vp_groups.keys(), key=vp_sort_key):
+        vp_spaces.extend(sorted(vp_groups[vp_key]))
+
+    # 3. Others (not BAM and not VP)
+    others = sorted(
+        [s for s in spaces if not s.startswith("BAM_") and not vp_pattern.match(s)],
+    )
+
+    return bam_spaces + vp_spaces + others
