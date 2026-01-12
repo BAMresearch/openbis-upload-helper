@@ -26,34 +26,61 @@
                             <div class="tab-content mt-3" id="myTabContent">
                                 <div class="tab-pane fade show active" id="checker-content" role="tabpanel" aria-labelledby="checker-tab">
                                     <h5 class="text-center">Export Options</h5>
-                                    <form id="upload-form" method="POST" enctype="multipart/form-data">
-                                        {% csrf_token %}
-                                        <div class="mb-3">
+                                    <!--GET-Form Space-->
+                                    <form method="get" action="{% url 'homepage' %}" class="mb-3 d-flex align-items-end gap-2">
+                                        <input type="hidden" name="space_select" value="1">
+                                        <div style="flex:1">
                                             <label for="selectedSpace" class="form-label">Select Space</label>
                                             {% if spaces %}
-                                                <select class="form-control" id="selectedSpace" name="selected_space" required>
-                                                    <option value="" selected disabled>Select Space</option>
+                                                <!-- onchange to set space -->
+                                                <select class="form-control" id="selectedSpace" name="space" required onchange="this.form.submit()">
+                                                    <option value="" disabled {% if not selected_space %}selected{% endif %}>Select Space</option>
                                                     {% for space in spaces %}
-                                                        <option value="{{ space }}">{{ space }}</option>
+                                                        <option value="{{ space }}" {% if selected_space == space %}selected{% endif %}>{{ space }}</option>
                                                     {% endfor %}
                                                 </select>
                                             {% else %}
-                                                <select class="form-control" id="selectedSpace" name="selected_space" disabled>
+                                                <select class="form-control" id="selectedSpace" name="space" disabled>
                                                     <option value="" selected disabled>No spaces available</option>
                                                 </select>
                                                 <div class="text-danger mt-2">No spaces are available for selection. Please contact your administrator.</div>
                                             {% endif %}
                                         </div>
+                                        <!-- Fallback without JS: Load-Button -->
+                                        <noscript>
+                                            <div>
+                                                <button type="submit" class="btn btn-outline-primary">Load</button>
+                                            </div>
+                                        </noscript>
+                                    </form>
+                                    <form id="upload-form" method="POST" enctype="multipart/form-data">
+                                        {% csrf_token %}
+                                        {% if selected_space %}
+                                            <input type="hidden" name="selected_space" value="{{ selected_space }}">
+                                        {% endif %}
                                         <div class="mb-3">
                                             <label for="projectName" class="form-label">Project Name</label>
-                                            <input type="text" class="form-control" id="projectName" value="{{ project_name }}" name="project_name" placeholder="Project Name" required>
+                                            <!-- Inputfied with suggestions 'projects' -->
+                                            <input type="text" class="form-control" id="projectName" value="{{ project_name }}" name="project_name" placeholder="Project Name" list="projects-list" required>
+                                            <datalist id="projects-list">
+                                                {% if projects %}
+                                                    {% for p in projects %}
+                                                        <option value="{{ p }}"></option>
+                                                    {% endfor %}
+                                                {% endif %}
+                                            </datalist>
                                         </div>
-
                                         <div class="mb-3">
                                             <label for="collectionName" class="form-label">Collection Name</label>
-                                            <input type="text" class="form-control" id="collectionName" value="{{ collection_name }}" name="collection_name" placeholder="Collection Name" required>
+                                            <input type="text" class="form-control" id="collectionName" value="{{ collection_name }}" name="collection_name" placeholder="Collection Name" list="collections-list">
+                                            <datalist id="collections-list">
+                                                {% if collections %}
+                                                    {% for c in collections %}
+                                                        <option value="{{ c }}"></option>
+                                                    {% endfor %}
+                                                {% endif %}
+                                            </datalist>
                                         </div>
-
                                         <div id="drop-area">
                                             <p>Drag & Drop<br>
                                             or<br>
@@ -65,7 +92,7 @@
                                         <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
                                         <script src="{% static 'js/homepage.js' %}"></script>
                                         <button type="submit" name="upload" class="btn btn-primary">Upload Files</button>
-                                        <div class="parser-tooltip-group" style="">
+                                        <div class="parser-tooltip-group">
                                             <span class="tooltip-trigger">
                                                 <a href="{% url 'homepage' %}?reset=1" class="btn btn-secondary text-center" style="text-align: right;"><i class="bi bi-arrow-clockwise"></i></a>
                                             </span>
@@ -73,6 +100,18 @@
                                                 <p>Resets Card 2 and 3</p>
                                             </div>
                                         </div>
+                                        <div class="parser-tooltip-group card-corner" >
+                                             <span class="tooltip-trigger">
+                                               <i class="bi bi-info-circle"></i> Available Parsers
+                                             </span>
+                                             <div class="tooltip-list">
+                                               <ul>
+                                                 {% for parser in parser_choices %}
+                                                   <li>{{ parser }}</li>
+                                                 {% endfor %}
+                                               </ul>
+                                             </div>
+                                       </div>
                                     </form>
                                 </div>
                             </div>
@@ -108,18 +147,6 @@
                             {% else %}
                                 <button type="submit" name="assign_parsers" class="btn btn-primary">Parse</button>
                             {% endif %}
-                            </div>
-                            <div class="parser-tooltip-group" style="text-align: right;">
-                              <span class="tooltip-trigger">
-                                <i class="bi bi-info-circle"></i> Available Parsers
-                              </span>
-                              <div class="tooltip-list">
-                                <ul>
-                                  {% for parser in parser_choices %}
-                                    <li>{{ parser }}</li>
-                                  {% endfor %}
-                                </ul>
-                              </div>
                             </div>
                         </div>
                     </form>
