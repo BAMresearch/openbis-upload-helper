@@ -29,7 +29,7 @@ maintainers = [
 ]
 license = { file = "LICENSE" }
 dependencies = [
-  "bam-masterdata>=0.6.3",
+  "bam-masterdata>=0.8.4",
   "django",
   "whitenoise",
   "pybis~=1.37.1rc4",
