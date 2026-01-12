@@ -12,3 +12,12 @@ REDIS_URL=redis://redis:6379/0
 # Flower
 CELERY_FLOWER_USER=debug
 CELERY_FLOWER_PASSWORD=debug
+
+# Application
+# ------------------------------------------------------------------------------
+OPENBIS_URL=https://www.example.de
+SPACE_FILTER=["DEFAULT","STORAGE"]
+
+UPLOAD_SIZE_LIMIT=10000000000
+UPLOAD_TIMEOUT_SECONDS=3000
+PROCESSING_TIMEOUT_SECONDS=300

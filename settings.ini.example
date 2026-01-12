@@ -51,6 +51,7 @@ SECRET_ENCRYPTION_KEY=CHANGE-ME
 ALLOWED_HOSTS=127.0.0.1,localhost
 CSRF_TRUSTED_ORIGINS=https://www.example.de
 
+SENTRY_DSN=
 
 [application]
 ; ---------------------------------------------------------------------------
@@ -74,9 +75,12 @@ PROCESSING_TIMEOUT_SECONDS=300
 ;   .envs/*/.django
 ; ---------------------------------------------------------------------------
 
-DATABASE_URL=postgres://user:password@host:5432/dbname
 REDIS_URL=redis://redis:6379/0
-
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=openbis_upload_helper
+POSTGRES_USER=debug
+POSTGRES_PASSWORD=debug
 
 [email]
 ; ---------------------------------------------------------------------------
@@ -91,7 +95,10 @@ EMAIL_HOST_USER=user@example.com
 EMAIL_HOST_PASSWORD=CHANGE-ME
 EMAIL_USE_TLS=True
 EMAIL_USE_SSL=False
+DJANGO_SERVER_EMAIL=
 
+MAILGUN_API_KEY=
+MAILGUN_DOMAIN=
 
 [concurrency]
 ; ---------------------------------------------------------------------------
