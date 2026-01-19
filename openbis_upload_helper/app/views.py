@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 from bam_masterdata.cli.cli import run_parser
 from bam_masterdata.logger import logger
@@ -78,7 +79,7 @@ def homepage(request):
     if not o:
         logger.info("User not logged in, redirecting to login page.")
         return redirect("login")
-    context = {}
+    context: dict[str, Any] = {}
     available_parsers, parser_choices = preload_context_request(request, context)
 
     # load
