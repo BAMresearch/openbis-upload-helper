@@ -181,7 +181,7 @@ class FileLoader:
 
         finally:
             if tmp_tar_path and Path(tmp_tar_path).exists():
-                Path.unlink(tmp_tar_path)
+                Path.unlink(Path(tmp_tar_path))
 
     def _process_regular_file(self, uploaded_file):
         tmp_dir = Path(tempfile.mkdtemp())
