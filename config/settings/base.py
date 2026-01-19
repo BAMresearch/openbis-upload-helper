@@ -341,3 +341,9 @@ OPENBIS_URL = env(
     "OPENBIS_URL",
     default="https://openbis.example.org",
 )
+SPACE_FILTER = env("SPACE_FILTER", default=["DEFAULT", "STORAGE"])
+
+
+UPLOAD_SIZE_LIMIT = env("UPLOAD_SIZE_LIMIT", default=10000000000)  # 10 GB
+UPLOAD_TIMEOUT_SECONDS = env("UPLOAD_TIMEOUT_SECONDS", default=3000)  # 50 min
+PROCESSING_TIMEOUT_SECONDS = env("PROCESSING_TIMEOUT_SECONDS", default=300)  # 5 min
