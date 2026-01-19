@@ -326,9 +326,18 @@ ACCOUNT_FORMS = {"signup": "openbis_upload_helper.users.forms.UserSignupForm"}
 SOCIALACCOUNT_ADAPTER = "openbis_upload_helper.users.adapters.SocialAccountAdapter"
 # https://docs.allauth.org/en/latest/socialaccount/configuration.html
 SOCIALACCOUNT_FORMS = {
-    "signup": "openbis_upload_helper.users.forms.UserSocialSignupForm"
+    "signup": "openbis_upload_helper.users.forms.UserSocialSignupForm",
 }
 
 
 # Your stuff...
 # ------------------------------------------------------------------------------
+# [openbis]
+SECRET_ENCRYPTION_KEY = env(
+    "DJANGO_SECRET_KEY",
+    default="QZedkfcMcVvpwwrGieUCQdPmsHaz1ZwHwSSQZnKyq9sb4ZcKzjEEa4XRUnQ1ZYk0",
+)
+OPENBIS_URL = env(
+    "OPENBIS_URL",
+    default="https://openbis.example.org",
+)
