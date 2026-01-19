@@ -1,1 +1,1 @@
-from .load import get_entry_point_parsers
+from .load import get_entry_point_parsers as get_entry_point_parsers
