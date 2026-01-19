@@ -1,5 +1,4 @@
 import datetime
-import os
 import re
 import shutil
 import tarfile
@@ -7,6 +6,7 @@ import tempfile
 import time
 import uuid
 import zipfile
+from pathlib import Path
 
 from bam_masterdata.logger import log_storage
 from bam_masterdata.logger import logger
@@ -36,10 +36,11 @@ def decrypt_password(encrypted_password):
         return decrypted_password.decode("utf-8")
     except InvalidToken as e:
         logger.error(f"Decryption failed: {e!s}")
-        raise InvalidToken("Decryption failed due to an invalid token.")
+        msg = "Decryption failed due to an invalid token."
+        raise InvalidToken(msg) from e
     except Exception as e:
         logger.error(f"Decryption error: {e!s}")
-        raise e
+        raise
 
 
 def get_openbis_from_cache(request):
@@ -96,7 +97,8 @@ class FileLoader:
 
     def load_files(self):
         if not self.uploaded_files:
-            raise ValueError("No files uploaded.")
+            msg = "No files uploaded."
+            raise ValueError(msg)
         # start countdown
         self.start_time = time.time()
 
@@ -104,9 +106,9 @@ class FileLoader:
         for uploaded_file in self.uploaded_files:
             file_sizes += uploaded_file.size
             if self.size_limit and file_sizes > int(float(self.size_limit)):
-                raise ValueError(
-                    f"Uploaded files exceed the size limit of {int(float(self.size_limit))} bytes.",
-                )
+                limit = int(float(self.size_limit))
+                msg = f"Uploaded files exceed limit of {limit} bytes."
+                raise ValueError(msg)
 
         for uploaded_file in self.uploaded_files:
             if uploaded_file.name.endswith(".zip"):
@@ -117,26 +119,27 @@ class FileLoader:
                 self._process_regular_file(uploaded_file)
 
         if not self.saved_file_names:
-            raise ValueError("No files were saved. Processing may have failed.")
+            msg = "No files were saved. Processing may have failed."
+            raise ValueError(msg)
         return self.saved_file_names
 
     def _process_zip(self, uploaded_file):
-        tmp_dir = tempfile.mkdtemp()
+        tmp_dir = Path(tempfile.mkdtemp())
         self.temp_dirs.append(tmp_dir)
-        zip_path = os.path.join(tmp_dir, uploaded_file.name)
-        with open(zip_path, "wb") as f:
+        zip_path = tmp_dir / uploaded_file.name
+        with Path.open(zip_path, "wb") as f:
             for chunk in uploaded_file.chunks():
                 f.write(chunk)
 
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             for zip_info in zip_ref.infolist():
                 if not zip_info.is_dir():
-                    target_path = os.path.join(tmp_dir, zip_info.filename)
-                    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                    target_path = tmp_dir / zip_info.filename
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
                     # read zip member in chunks to allow timeout checks
                     with (
                         zip_ref.open(zip_info) as src,
-                        open(target_path, "wb") as out_file,
+                        Path.open(target_path, "wb") as out_file,
                     ):
                         while True:
                             chunk = src.read(8192)
@@ -144,10 +147,12 @@ class FileLoader:
                                 break
                             out_file.write(chunk)
                     if zip_info.filename in self.selected_files:
-                        self.saved_file_names.append((zip_info.filename, target_path))
+                        self.saved_file_names.append(
+                            (zip_info.filename, str(target_path)),
+                        )
 
     def _process_tar(self, uploaded_file):
-        suffix = os.path.splitext(uploaded_file.name)[1]
+        suffix = Path(uploaded_file.name).suffix
         tmp_tar_path = None
         try:
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_tar:
@@ -155,36 +160,38 @@ class FileLoader:
                     tmp_tar.write(chunk)
                 tmp_tar_path = tmp_tar.name
 
-            tmp_dir = tempfile.mkdtemp()
+            tmp_dir = Path(tempfile.mkdtemp())
             self.temp_dirs.append(tmp_dir)
             with tarfile.open(tmp_tar_path, "r:*") as tar_ref:
                 for member in tar_ref.getmembers():
                     if member.isfile():
                         if extracted_file := tar_ref.extractfile(member):
-                            target_path = os.path.join(tmp_dir, member.name)
-                            os.makedirs(os.path.dirname(target_path), exist_ok=True)
-                            with open(target_path, "wb") as out_file:
+                            target_path = tmp_dir / member.name
+                            target_path.parent.mkdir(parents=True, exist_ok=True)
+                            with Path.open(target_path, "wb") as out_file:
                                 while True:
                                     chunk = extracted_file.read(8192)
                                     if not chunk:
                                         break
                                     out_file.write(chunk)
                             if member.name in self.selected_files:
-                                self.saved_file_names.append((member.name, target_path))
+                                self.saved_file_names.append(
+                                    (member.name, str(target_path)),
+                                )
 
         finally:
-            if tmp_tar_path and os.path.exists(tmp_tar_path):
-                os.remove(tmp_tar_path)
+            if tmp_tar_path and Path(tmp_tar_path).exists():
+                Path.unlink(Path(tmp_tar_path))
 
     def _process_regular_file(self, uploaded_file):
-        tmp_dir = tempfile.mkdtemp()
+        tmp_dir = Path(tempfile.mkdtemp())
         self.temp_dirs.append(tmp_dir)
-        target_path = os.path.join(tmp_dir, uploaded_file.name)
-        with open(target_path, "wb") as f:
+        target_path = tmp_dir / uploaded_file.name
+        with Path.open(target_path, "wb") as f:
             for chunk in uploaded_file.chunks():
                 f.write(chunk)
         if uploaded_file.name in self.selected_files:
-            self.saved_file_names.append((uploaded_file.name, target_path))
+            self.saved_file_names.append((uploaded_file.name, str(target_path)))
 
     def antivirus_scan(self):
         # Placeholder for antivirus scanning logic
@@ -204,7 +211,8 @@ class FilesParser:
         for idx, (file_name, file_path) in enumerate(self.uploaded_files):
             parser_name = request.POST.get(f"parser_type_{idx}")
             if not parser_name:
-                raise ValueError(f"No parser selected for file {file_name}")
+                msg = f"No parser selected for file {file_name}"
+                raise ValueError(msg)
 
             if parser_name not in self.parser_instances:
                 for parser in self.available_parsers.values():
@@ -225,20 +233,24 @@ class FileRemover:
 
     def cleanup(self):
         for _, temp_file in self.uploaded_files:
-            temp_dir = os.path.dirname(temp_file)
-            if os.path.exists(temp_dir):
+            temp_dir = Path(temp_file).parent
+            if temp_dir.exists():
                 shutil.rmtree(temp_dir, ignore_errors=True)
         self.uploaded_files.clear()
 
 
-def log_results(request, parsed_files={}, context={}):
+def log_results(request, parsed_files=None, context=None):
+    if parsed_files is None:
+        parsed_files = {}
+    if context is None:
+        context = {}
     log_storage.clear()
     for parser, paths in parsed_files.items():
         for path in paths:
             log_storage.append(
                 {
-                    "event": f"[{parser}] Parsed: {os.path.basename(path)}",
-                    "timestamp": datetime.datetime.now().isoformat(),
+                    "event": f"[{parser}] Parsed: {Path(path).name}",
+                    "timestamp": datetime.datetime.now(tz=datetime.UTC).isoformat(),
                     "level": "info",
                 },
             )
@@ -299,8 +311,7 @@ def reorganize_spaces(spaces: list[str]) -> list[str]:
 
     # Sort by numeric value, not lexicographically (VP.2 < VP.10)
     def vp_sort_key(vp_key: str) -> int:
-        n = int(vp_key.split(".")[1])
-        return n
+        return int(vp_key.split(".")[1])
 
     vp_spaces: list[str] = []
     for vp_key in sorted(vp_groups.keys(), key=vp_sort_key):

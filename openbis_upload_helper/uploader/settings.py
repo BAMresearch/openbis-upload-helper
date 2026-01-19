@@ -10,7 +10,6 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
-import os
 from pathlib import Path
 
 from decouple import config as environ
@@ -24,7 +23,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = environ("SECRET_KEY")
 
-# Use the generated key (securely store this key in production, e.g., as an environment variable)
+# Use the generated key (securely store this key in production, e.g., as an environment
+# variable)
 SECRET_ENCRYPTION_KEY = environ("SECRET_ENCRYPTION_KEY")
 
 OPENBIS_URL = environ("OPENBIS_URL")
@@ -41,7 +41,7 @@ ALLOWED_HOSTS = environ(
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-    }
+    },
 }
 
 
@@ -69,7 +69,9 @@ MIDDLEWARE = [
 ]
 
 CSRF_TRUSTED_ORIGINS = environ(
-    "CSRF_TRUSTED_ORIGINS", default=[], cast=lambda v: [s.strip() for s in v.split(",")]
+    "CSRF_TRUSTED_ORIGINS",
+    default=[],
+    cast=lambda v: [s.strip() for s in v.split(",")],
 )
 
 ROOT_URLCONF = "uploader.urls"
@@ -100,7 +102,7 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
-    }
+    },
 }
 
 
@@ -109,7 +111,7 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",  # noqa: E501
     },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
@@ -186,7 +188,7 @@ LOGGING = {
         "file": {
             "level": "DEBUG",
             "class": "logging.FileHandler",
-            "filename": os.path.join(BASE_DIR, "debug.log"),
+            "filename": BASE_DIR / "debug.log",
             "formatter": "verbose",
         },
     },
