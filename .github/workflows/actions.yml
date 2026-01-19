@@ -37,7 +37,7 @@ jobs:
         python -m mypy --ignore-missing-imports --follow-imports=silent --no-strict-optional openbis_upload_helper tests
     - name: Test with pytest
       run: |
-        python -m pytest -sv tests
+        python -m pytest -sv tests --reuse-db
     - name: Ruff linting
       run: |
         ruff check .
