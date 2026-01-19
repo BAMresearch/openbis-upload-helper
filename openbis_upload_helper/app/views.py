@@ -60,7 +60,7 @@ def login(request):
             cache.set(session_id, o, timeout=60 * 60)  # Cache for 1 hour (adjustable)
             return redirect("homepage")
 
-        except Exception as e:
+        except (ValueError, RuntimeError, ConnectionError) as e:
             logger.error(f"Login failed for user '{username}': {e}", exc_info=True)
             error = "Invalid username/password or personal access token."
 
@@ -115,18 +115,8 @@ def homepage(request):
                 collections_raw = o.get_experiments()
 
             # Filter
-            try:
-                projects = [extract_name(p) for p in projects_raw]
-            except Exception:
-                projects = [extract_name(p) for p in projects_raw]
-
-            try:
-                collections = [extract_name(c) for c in collections_raw]
-            except Exception:
-                collections = [extract_name(c) for c in collections_raw]
-
-            # context["projects"] = projects
-            # context["collections"] = collections
+            projects = [extract_name(p) for p in projects_raw]
+            collections = [extract_name(c) for c in collections_raw]
 
     else:
         projects = []
@@ -167,7 +157,7 @@ def homepage(request):
             request.session.pop("checker_logs", None)
             return redirect("homepage")
 
-        except Exception as e:
+        except (OSError, ValueError) as e:
             logger.exception("Error while uploading files")
             context["error"] = str(e)
             return render(request, "homepage.html", context)
@@ -205,7 +195,7 @@ def homepage(request):
             request.session["parsers_assigned"] = True
             return redirect("homepage")
 
-        except Exception as e:
+        except (ValueError, RuntimeError) as e:
             logger.exception("Error while assigning parsers")
             context["error"] = str(e)
             return render(request, "homepage.html", context)
