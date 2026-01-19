@@ -41,6 +41,7 @@ jobs:
         python -m pytest -sv tests --reuse-db
     - name: Ruff linting
       run: |
+        pip install ruff
         ruff check .
     - name: Ruff formatting
       run: |
