@@ -73,7 +73,7 @@ def logout_view(request):
     return redirect("login")
 
 
-def homepage(request):
+def homepage(request):  # noqa: C901, PLR0911, PLR0912, PLR0915  (too complex, too many branches, too many statements)
     # Check if the user is logged in
     o = get_openbis_from_cache(request)
     if not o:
