@@ -1,11 +1,13 @@
 # ==== pytest ====
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "--ds=config.settings.test --reuse-db --import-mode=importlib"
+addopts = "--reuse-db --import-mode=importlib"
 python_files = [
     "tests.py",
     "test_*.py",
 ]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+
 
 # ==== Coverage ====
 [tool.coverage.run]
