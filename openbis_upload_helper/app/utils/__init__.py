@@ -1,12 +1,10 @@
-from .utils import (
-    FileLoader,
-    FileRemover,
-    FilesParser,
-    decrypt_password,
-    encrypt_password,
-    extract_name,
-    get_openbis_from_cache,
-    log_results,
-    preload_context_request,
-    reorganize_spaces,
-)
+from .utils import FileLoader
+from .utils import FileRemover
+from .utils import FilesParser
+from .utils import decrypt_password
+from .utils import encrypt_password
+from .utils import extract_name
+from .utils import get_openbis_from_cache
+from .utils import log_results
+from .utils import preload_context_request
+from .utils import reorganize_spaces
