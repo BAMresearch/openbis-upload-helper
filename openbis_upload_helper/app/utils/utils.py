@@ -19,19 +19,34 @@ from pybis import Openbis
 
 from openbis_upload_helper.uploader.entry_points import get_entry_point_parsers
 
-# Instantiate the Fernet class with the secret key
-cipher_suite = Fernet(settings.SECRET_ENCRYPTION_KEY)
+
+
+def get_cipher_suite():
+    """Return a Fernet instance using the configured secret key.
+
+    This is created lazily to avoid requiring a valid key at import time
+    (tests set the key via fixtures during collection/runtime).
+    """
+    key = getattr(settings, "SECRET_ENCRYPTION_KEY", None)
+    if key is None:
+        raise ValueError("SECRET_ENCRYPTION_KEY is not set in settings")
+    # Ensure key is bytes
+    if isinstance(key, str):
+        key = key.encode("utf-8")
+    return Fernet(key)
 
 
 # Encrypt the password
 def encrypt_password(plain_text_password):
+    cipher_suite = get_cipher_suite()
     encrypted_password = cipher_suite.encrypt(plain_text_password.encode("utf-8"))
     return encrypted_password.decode("utf-8")  # Return as a string
 
 
 def decrypt_password(encrypted_password):
     try:
-        # Remove the manual padding correction, Fernet handles it automatically
+        # Create cipher lazily and decrypt. Fernet handles padding automatically.
+        cipher_suite = get_cipher_suite()
         decrypted_password = cipher_suite.decrypt(encrypted_password.encode("utf-8"))
         return decrypted_password.decode("utf-8")
     except InvalidToken as e:
