@@ -175,11 +175,7 @@ def mock_openbis():
 
     # LOGIN Methode
     def login(username=None, password=None, personal_access_token=None, **kwargs):
-        if personal_access_token:
-            # Token-Login
-            mock_openbis.username = "token_user"
-            mock_openbis.logged_in = True
-        elif password is not None:
+        if password is not None:
             if password != "correct_password":
                 raise RuntimeError("Login failed")
             mock_openbis.username = username
@@ -187,7 +183,13 @@ def mock_openbis():
         else:
             raise RuntimeError("Login failed: missing credentials")
 
+    def set_token(token, save_token=False):
+        if token != "mytoken":
+            raise RuntimeError("Login failed: invalid token")
+        mock_openbis.logged_in = True
+
     mock_openbis.login.side_effect = login
+    mock_openbis.set_token.side_effect = set_token
 
     # Objekt-Erstellung
     mock_openbis._objects = []
