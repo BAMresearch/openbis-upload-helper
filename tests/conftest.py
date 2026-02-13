@@ -2,6 +2,7 @@ import base64
 import os
 from unittest.mock import MagicMock
 
+import django
 import pytest
 from bam_masterdata.logger import log_storage
 from bam_masterdata.metadata.definitions import ObjectTypeDef
@@ -25,6 +26,14 @@ if os.getenv("_PYTEST_RAISE", "0") != "0":
     @pytest.hookimpl(tryfirst=True)
     def pytest_internalerror(excinfo):
         raise excinfo.value
+
+
+@pytest.fixture(scope="session", autouse=True)
+def configure_django_settings():
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.test")
+    if not settings.configured:
+        django.setup()
+    settings.ROOT_URLCONF = "openbis_upload_helper.app.urls"
 
 
 @pytest.fixture(autouse=True)
@@ -335,3 +344,34 @@ def set_secret_encryption_key():
     settings.SECRET_ENCRYPTION_KEY = base64.urlsafe_b64encode(
         Fernet.generate_key(),
     ).decode()
+
+
+class DummySession(dict):
+    def __init__(self):
+        super().__init__()
+        self.flushed = False
+
+    def flush(self):
+        self.flushed = True
+        self.clear()
+
+
+@pytest.fixture
+def attach_session():
+    def _attach(request):
+        request.session = DummySession()
+        return request
+
+    return _attach
+
+
+@pytest.fixture
+def make_uploaded_file():
+    def _make(name="file.txt", content=b"x"):
+        uploaded_file = MagicMock()
+        uploaded_file.name = name
+        uploaded_file.size = len(content)
+        uploaded_file.chunks.return_value = [content]
+        return uploaded_file
+
+    return _make
