@@ -34,6 +34,12 @@ def configure_django_settings():
     if not settings.configured:
         django.setup()
     settings.ROOT_URLCONF = "openbis_upload_helper.app.urls"
+    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    # pytest-django clears django.core.mail.outbox automatically; ensure it exists
+    from django.core import mail  # noqa: PLC0415
+
+    if not hasattr(mail, "outbox"):
+        mail.outbox = []
 
 
 @pytest.fixture(autouse=True)
