@@ -66,6 +66,7 @@ dev = [
     "structlog==24.4.0",
     "watchfiles==1.1.1",
     "werkzeug[watchdog]==3.1.4",
+    "ruff",
 ]
 parsers = [
     "masterdata-parser-example@git+https://github.com/BAMresearch/masterdata-parser-example.git@main",
