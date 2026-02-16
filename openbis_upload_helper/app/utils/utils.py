@@ -20,7 +20,6 @@ from pybis import Openbis
 from openbis_upload_helper.uploader.entry_points import get_entry_point_parsers
 
 
-
 def get_cipher_suite():
     """Return a Fernet instance using the configured secret key.
 
