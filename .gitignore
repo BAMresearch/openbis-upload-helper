@@ -341,3 +341,7 @@ openbis_upload_helper/media/
 .env
 .envs/*
 !.envs/.local/
+
+
+### SQL
+\ndb.sqlite3\ndb.sqlite3-journal

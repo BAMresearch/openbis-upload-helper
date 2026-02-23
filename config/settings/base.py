@@ -11,10 +11,14 @@ BASE_DIR = Path(__file__).resolve(strict=True).parent.parent.parent
 APPS_DIR = BASE_DIR / "openbis_upload_helper"
 env = environ.Env()
 
-READ_DOT_ENV_FILE = env.bool("DJANGO_READ_DOT_ENV_FILE", default=False)
+READ_DOT_ENV_FILE = env.bool("DJANGO_READ_DOT_ENV_FILE", default=True)
 if READ_DOT_ENV_FILE:
-    # OS environment variables take precedence over variables from .env
-    env.read_env(str(BASE_DIR / ".env"))
+    # Read all env files from .envs/.local/ directory
+    env_dir = BASE_DIR / ".envs" / ".local"
+    if env_dir.is_dir():
+        for env_file in sorted(env_dir.glob(".*")):
+            if env_file.is_file():
+                env.read_env(str(env_file), overwrite=False)
 
 # GENERAL
 # ------------------------------------------------------------------------------
@@ -50,7 +54,7 @@ LOCALE_PATHS = [str(BASE_DIR / "locale")]
 DATABASES = {
     "default": env.db(
         "DATABASE_URL",
-        default="postgres:///openbis_upload_helper",
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
     ),
 }
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
@@ -273,6 +277,8 @@ if USE_TZ:
     # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std:setting-timezone
     CELERY_TIMEZONE = TIME_ZONE
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std:setting-broker_url
+CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=True)
+CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_BROKER_URL = REDIS_URL
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#redis-backend-use-ssl
 CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE} if REDIS_SSL else None
