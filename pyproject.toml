@@ -36,6 +36,8 @@ dependencies = [
     "uvicorn[standard]==0.38.0",
     "whitenoise==6.11.0",
     "bam-masterdata>=0.8.4",
+    "django-debug-toolbar==6.1.0",
+    "django-extensions>=4.1",
 ]
 
 [project.urls]

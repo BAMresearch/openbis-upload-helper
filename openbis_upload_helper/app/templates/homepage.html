@@ -13,7 +13,7 @@
     </head>
     <body class="bg-light">
         <div class="d-flex justify-content-end">
-            <form action="{% url 'logout' %}" method="POST">
+            <form action="{% url 'app:logout' %}" method="POST">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-danger" style="background-color: var(--bam-rot);">Logout</button>
             </form>
@@ -27,7 +27,7 @@
                                 <div class="tab-pane fade show active" id="checker-content" role="tabpanel" aria-labelledby="checker-tab">
                                     <h5 class="text-center">Export Options</h5>
                                     <!--GET-Form Space-->
-                                    <form method="get" action="{% url 'homepage' %}" class="mb-3 d-flex align-items-end gap-2">
+                                    <form method="get" action="{% url 'app:homepage' %}" class="mb-3 d-flex align-items-end gap-2">
                                         <input type="hidden" name="space_select" value="1">
                                         <div style="flex:1">
                                             <label for="selectedSpace" class="form-label">Select Space</label>
@@ -94,7 +94,7 @@
                                         <button type="submit" name="upload" class="btn btn-primary">Upload Files</button>
                                         <div class="parser-tooltip-group">
                                             <span class="tooltip-trigger">
-                                                <a href="{% url 'homepage' %}?reset=1" class="btn btn-secondary text-center" style="text-align: right;"><i class="bi bi-arrow-clockwise"></i></a>
+                                                <a href="{% url 'app:homepage' %}?reset=1" class="btn btn-secondary text-center" style="text-align: right;"><i class="bi bi-arrow-clockwise"></i></a>
                                             </span>
                                             <div class="tooltip-list">
                                                 <p>Resets Card 2 and 3</p>

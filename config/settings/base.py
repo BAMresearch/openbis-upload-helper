@@ -93,6 +93,7 @@ THIRD_PARTY_APPS = [
 
 LOCAL_APPS = [
     "openbis_upload_helper.users",
+    "openbis_upload_helper.app",
     # Your stuff: custom apps go here
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
@@ -340,8 +341,8 @@ SOCIALACCOUNT_FORMS = {
 # ------------------------------------------------------------------------------
 # [openbis]
 SECRET_ENCRYPTION_KEY = env(
-    "DJANGO_SECRET_KEY",
-    default="QZedkfcMcVvpwwrGieUCQdPmsHaz1ZwHwSSQZnKyq9sb4ZcKzjEEa4XRUnQ1ZYk0",
+    "SECRET_ENCRYPTION_KEY",
+    default="8H6z8xLywBu2XPXVncDdW95X_0UlZtVxJRN-9b2Ehms=",
 )
 OPENBIS_URL = env(
     "OPENBIS_URL",

@@ -1,5 +1,9 @@
+import datetime
+import os
+import tarfile
+import tempfile
 import uuid
-from typing import Any
+import zipfile
 
 from bam_masterdata.cli.cli import run_parser
 from bam_masterdata.logger import logger
@@ -44,11 +48,9 @@ def login(request):
                 request.session["openbis_password"] = encrypted_password
                 request.session["openbis_session_id"] = session_id
                 cache.set(
-                    session_id,
-                    o,
-                    timeout=60 * 60,
+                    session_id, o, timeout=60 * 60
                 )  # Cache for 1 hour (adjustable)
-                return redirect("homepage")
+                return redirect("app:homepage")
 
             # fall back to classic username/password login
             o.login(username, password, save_token=True)
@@ -58,9 +60,9 @@ def login(request):
             request.session["openbis_password"] = encrypted_password
             request.session["openbis_session_id"] = session_id
             cache.set(session_id, o, timeout=60 * 60)  # Cache for 1 hour (adjustable)
-            return redirect("homepage")
+            return redirect("app:homepage")
 
-        except (ValueError, RuntimeError, ConnectionError) as e:
+        except Exception as e:
             logger.error(f"Login failed for user '{username}': {e}", exc_info=True)
             error = "Invalid username/password or personal access token."
 
@@ -70,16 +72,16 @@ def login(request):
 def logout_view(request):
     request.session.flush()  # Clear all session data
     logout(request)
-    return redirect("login")
+    return redirect("app:login")
 
 
-def homepage(request):  # noqa: C901, PLR0911, PLR0912, PLR0915  (too complex, too many branches, too many statements)
+def homepage(request):
     # Check if the user is logged in
     o = get_openbis_from_cache(request)
     if not o:
         logger.info("User not logged in, redirecting to login page.")
-        return redirect("login")
-    context: dict[str, Any] = {}
+        return redirect("app:login")
+    context = {}
     available_parsers, parser_choices = preload_context_request(request, context)
 
     # load
@@ -115,8 +117,18 @@ def homepage(request):  # noqa: C901, PLR0911, PLR0912, PLR0915  (too complex, t
                 collections_raw = o.get_experiments()
 
             # Filter
-            projects = [extract_name(p) for p in projects_raw]
-            collections = [extract_name(c) for c in collections_raw]
+            try:
+                projects = [extract_name(p) for p in projects_raw]
+            except Exception:
+                projects = [extract_name(p) for p in projects_raw]
+
+            try:
+                collections = [extract_name(c) for c in collections_raw]
+            except Exception:
+                collections = [extract_name(c) for c in collections_raw]
+
+            # context["projects"] = projects
+            # context["collections"] = collections
 
     else:
         projects = []
@@ -130,7 +142,7 @@ def homepage(request):  # noqa: C901, PLR0911, PLR0912, PLR0915  (too complex, t
     if request.method == "GET" and "reset" in request.GET:
         for key in ["uploaded_files", "checker_logs"]:
             request.session.pop(key, None)
-        return redirect("homepage")
+        return redirect("app:homepage")
 
     # CARD 1: Select files
     if request.method == "POST" and "upload" in request.POST:
@@ -155,9 +167,9 @@ def homepage(request):  # noqa: C901, PLR0911, PLR0912, PLR0915  (too complex, t
             request.session["uploaded_files"] = saved_file_names
             request.session["parsers_assigned"] = False
             request.session.pop("checker_logs", None)
-            return redirect("homepage")
+            return redirect("app:homepage")
 
-        except (OSError, ValueError) as e:
+        except Exception as e:
             logger.exception("Error while uploading files")
             context["error"] = str(e)
             return render(request, "homepage.html", context)
@@ -193,9 +205,9 @@ def homepage(request):  # noqa: C901, PLR0911, PLR0912, PLR0915  (too complex, t
             context["logs"] = context_logs
             request.session["checker_logs"] = context_logs
             request.session["parsers_assigned"] = True
-            return redirect("homepage")
+            return redirect("app:homepage")
 
-        except (ValueError, RuntimeError) as e:
+        except Exception as e:
             logger.exception("Error while assigning parsers")
             context["error"] = str(e)
             return render(request, "homepage.html", context)
@@ -223,4 +235,4 @@ def homepage(request):  # noqa: C901, PLR0911, PLR0912, PLR0915  (too complex, t
 @require_POST
 def clear_state(request):
     request.session.pop("checker_logs", None)
-    return redirect("homepage")
+    return redirect("app:homepage")

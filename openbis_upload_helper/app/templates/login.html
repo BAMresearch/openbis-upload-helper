@@ -16,7 +16,7 @@
                 <div class="card">
                         <div class="card-body">
                             <h5 class="text-center">Login to OpenBIS</h5>
-                            <form method="POST" action="{% url 'login' %}">
+                            <form method="POST" action="{% url 'app:login' %}">
                                 {% csrf_token %}
                                 <div class="mb-3">
                                     <label for="username" class="form-label">Username</label>
