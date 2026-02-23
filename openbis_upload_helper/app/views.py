@@ -5,7 +5,6 @@ import tempfile
 import uuid
 import zipfile
 
-from bam_masterdata.cli.cli import run_parser
 from bam_masterdata.logger import logger
 from decouple import config as environ
 from django.conf import settings
@@ -16,8 +15,11 @@ from django.shortcuts import render
 from django.views.decorators.http import require_POST
 from pybis import Openbis
 
+from .models import UploadSession
+from .models import UploadTask
+from .tasks import cleanup_temporary_files
+from .tasks import process_uploaded_files
 from .utils import FileLoader
-from .utils import FileRemover
 from .utils import FilesParser
 from .utils import encrypt_password
 from .utils import extract_name
@@ -188,16 +190,63 @@ def homepage(request):
         available_parsers = context["available_parsers"]
 
         try:
+            # Create UploadSession to track this upload
+            upload_session = UploadSession.objects.create(
+                openbis_username=request.session.get("openbis_username"),
+                space_name=request.session.get("selected_space"),
+                project_name=request.session.get("project_name", ""),
+                collection_name=request.session.get("collection_name", ""),
+                status="PROCESSING",
+            )
+
+            # Assign parsers to files
             files_parser_class = FilesParser(uploaded_files, available_parsers, o)
             parsed_files, files_parser = files_parser_class.assign_parsers(request)
 
-            run_parser(
-                openbis=o,
-                files_parser=files_parser,
+            # Start Celery task for processing files asynchronously
+            # Note: We use parsed_files (dict with parser names as keys) instead of files_parser
+            # because files_parser has object instances as keys which can't be JSON serialized
+            process_task = process_uploaded_files.delay(
+                parsed_files=parsed_files,
                 project_name=request.session.get("project_name", ""),
                 collection_name=request.session.get("collection_name", ""),
                 space_name=request.session.get("selected_space"),
+                openbis_session_id=request.session.get("openbis_session_id"),
             )
+
+            # Create UploadTask to track the Celery task
+            upload_task = UploadTask.objects.create(
+                upload_session=upload_session,
+                task_id=process_task.id,
+                task_type="PROCESS_FILES",
+                state="PENDING",
+            )
+
+            logger.info(
+                f"Started async file processing task {process_task.id} for user {request.session.get('openbis_username')}"
+            )
+
+            # Start cleanup task (will run after processing)
+            cleanup_task = cleanup_temporary_files.delay(
+                uploaded_files=uploaded_files,
+            )
+
+            # Create another UploadTask for cleanup
+            UploadTask.objects.create(
+                upload_session=upload_session,
+                task_id=cleanup_task.id,
+                task_type="CLEANUP_FILES",
+                state="PENDING",
+            )
+
+            logger.info(
+                f"Started async cleanup task {cleanup_task.id} for user {request.session.get('openbis_username')}"
+            )
+
+            # Clear session for next upload
+            request.session.pop("uploaded_files", None)
+            request.session.pop("parsers_assigned", None)
+            request.session.pop("checker_logs", None)
 
             # save Logs
             context_logs = log_results(request, parsed_files, context)
@@ -211,11 +260,6 @@ def homepage(request):
             logger.exception("Error while assigning parsers")
             context["error"] = str(e)
             return render(request, "homepage.html", context)
-
-        finally:
-            # remove temporary directories
-            file_remover = FileRemover(uploaded_files)
-            file_remover.cleanup()
 
     # GET request
     # for card 1 forms
