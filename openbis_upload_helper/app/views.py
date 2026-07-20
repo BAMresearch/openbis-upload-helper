@@ -5,7 +5,7 @@ import tempfile
 import uuid
 import zipfile
 
-from bam_masterdata.cli.cli import run_parser
+from bam_masterdata.cli.run_parser import run_parser_with_transactions
 from bam_masterdata.logger import logger
 from decouple import config as environ
 from django.conf import settings
@@ -191,7 +191,7 @@ def homepage(request):
             files_parser_class = FilesParser(uploaded_files, available_parsers, o)
             parsed_files, files_parser = files_parser_class.assign_parsers(request)
 
-            run_parser(
+            run_parser_with_transactions(
                 openbis=o,
                 files_parser=files_parser,
                 project_name=request.session.get("project_name", ""),

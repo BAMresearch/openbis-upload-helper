@@ -213,3 +213,6 @@ namespaces = false
 
 [tool.setuptools_scm]
 write_to = "openbis_upload_helper/_version.py"
+
+[tool.uv.sources]
+bam-masterdata = { git = "https://github.com/BAMresearch/bam-masterdata.git", rev = "main" }
