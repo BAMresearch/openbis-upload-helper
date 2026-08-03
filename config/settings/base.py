@@ -1,7 +1,9 @@
 # ruff: noqa: ERA001, E501
 """Base settings to build other settings files upon."""
 
+import os
 import ssl
+from configparser import ConfigParser
 from pathlib import Path
 
 import environ
@@ -19,6 +21,17 @@ if READ_DOT_ENV_FILE:
         for env_file in sorted(env_dir.glob(".*")):
             if env_file.is_file():
                 env.read_env(str(env_file), overwrite=False)
+
+
+config = ConfigParser()
+ini_path = BASE_DIR / "settings.ini"
+
+if ini_path.exists():
+    config.read(ini_path)
+
+    # Load settings ini and set Environment-Variables
+    for key, value in config["settings"].items():
+        os.environ.setdefault(key.upper(), value)
 
 # GENERAL
 # ------------------------------------------------------------------------------
