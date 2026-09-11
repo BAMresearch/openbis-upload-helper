@@ -1,63 +1,37 @@
-[build-system]
-requires = ["setuptools>=61.0.0", "setuptools-scm>=8.0"]
-build-backend = "setuptools.build_meta"
-
 [project]
-classifiers = [
-  "Natural Language :: English",
-  "Intended Audience :: Science/Research",
-  "Operating System :: OS Independent",
-  "Programming Language :: Python",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-]
 name = "openbis-upload-helper"
-description = "An upload helper app for OpenBIS."
-dynamic = ["version"]
+version = "1.0.0"
+description = "Desktop helper for parsing and uploading scientific data to openBIS."
 readme = "README.md"
-requires-python = ">=3.10"
-authors = [
-  { name = "Bastian Rühle", email = "bastian.ruehle@bam.de" },
-  { name = "Ingo Breßler", email = "ingo.bressler@bam.de" },
-  { name = "Jose M. Pizarro", email = "jose.pizarro-blanco@bam.de" },
-]
-maintainers = [
-  { name = "Bastian Rühle", email = "bastian.ruehle@bam.de" },
-  { name = "Ingo Breßler", email = "ingo.bressler@bam.de" },
-  { name = "Jose M. Pizarro", email = "jose.pizarro-blanco@bam.de" },
-]
-license = { file = "LICENSE" }
+requires-python = ">=3.14"
 dependencies = [
-  "bam-masterdata>=0.8.4",
-  "django",
-  "whitenoise",
-  "pybis~=1.37.1rc4",
-  "cryptography>=45.0.2",
-  "python-decouple",
+    "bam-masterdata>=0.13.0",
+    "pybis>=1.37.5",
+    "pydantic>=2.13.5",
+    "openbis-parser-example>=1.0.0",
 ]
 
-[project.urls]
-"Homepage" = "https://github.com/BAMresearch/openbis-upload-helper"
-"Bug Tracker" = "https://github.com/BAMresearch/openbis-upload-helper/issues"
-
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
-  "mypy==1.0.1",
-  "ruff==0.11.4",
-  "pytest",
-  "pytest-timeout",
-  "pytest-cov",
-  "structlog==24.4.0",
+    "pyinstaller>=6.22.2",
+    "ruff>=0.16.6",
 ]
-parsers = [
-  "masterdata-parser-example@git+https://github.com/BAMresearch/masterdata-parser-example.git@main",
-  "sigmabam2openbis@git+https://github.com/BAMresearch/sigmabam2openbis.git@main",
-]
+
+[project.scripts]
+openbis-upload-helper = "openbis_upload_helper.main:main"
+
+[build-system]
+requires = ["uv_build>=0.12.10,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = "src"
 
 [tool.ruff]
+line-length = 88
+indent-width = 4
 # Exclude a variety of commonly ignored directories.
-include = ["openbis_upload_helper/*.py", "tests/*.py"]
+include = ["src/openbis_upload_helper/*.py", "tests/*.py"]
 exclude = [
     ".bzr",
     ".direnv",
@@ -82,9 +56,6 @@ exclude = [
     "venv",
     "dependencies",
 ]
-# Same as Black.
-line-length = 88
-indent-width = 4
 
 [tool.ruff.lint]
 select = [
@@ -103,6 +74,7 @@ ignore = [
     "PLR0911", # Too many return statements
     "PLR0912", # Too many branches
     "PLR0913", # Too many arguments in function definition
+    "PLR0917", # Too many local variables
     "PLR0915", # Too many statements
     "PLR2004", # Magic value used instead of constant
     "PLW0603", # Using the global statement
@@ -113,27 +85,9 @@ ignore = [
 fixable = ["ALL"]
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-# this is entirely optional, you can remove this if you wish to
+
 [tool.ruff.format]
-# use double quotes for strings.
 quote-style = "double"
-# indent with spaces, rather than tabs.
 indent-style = "space"
-# Like Black, respect magic trailing commas.
 skip-magic-trailing-comma = false
-# Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
-
-[tool.mypy]
-strict = false
-ignore_missing_imports = true
-follow_imports = "silent"
-no_strict_optional = true
-disable_error_code = "import, annotation-unchecked"
-
-[tool.setuptools.packages.find]
-where = ["."]
-namespaces = false
-
-[tool.setuptools_scm]
-write_to = "openbis_upload_helper/_version.py"

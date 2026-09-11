@@ -115,3 +115,59 @@ This project discovers parser plugins at runtime using Python entry points.
 
     The application uses the loader function [get_entry_point_parsers]
     It scans the configured entry point group and returns the available parser plugins dynamically.
+
+
+## Tauri dev
+
+Make sure you have installed the prerequisites for your OS: https://tauri.app/start/prerequisites/, then run:
+
+```bash
+cd openbis-upload-helper
+pnpm install
+pnpm tauri android init
+```
+
+For Desktop development, run:
+
+```bash
+pnpm tauri dev
+```
+
+For Android development, run:
+
+```bash
+pnpm tauri android dev
+```
+
+For Python sidecar:
+
+```bash
+uv run pyinstaller \
+  --name openbis-helper-python \
+  src/openbis_upload_helper/main.py
+```
+
+### Build order
+
+The build order is:
+
+1. Build the Python sidecar with PyInstaller:
+
+```bash
+uv run pyinstaller \
+  --onefile \
+  --name openbis-helper-python \
+  src/openbis_upload_helper/main.py
+```
+
+2. Copy or rename the resulting executable into the path/name Tauri expects, for example:
+
+```
+src-tauri/binaries/openbis-helper-python-x86_64-unknown-linux-gnu
+```
+
+3. Then build Tauri:
+
+```bash
+pnpm tauri build
+```
