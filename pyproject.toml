@@ -9,6 +9,7 @@ dependencies = [
     "pybis>=1.37.5",
     "pydantic>=2.13.5",
     "openbis-parser-example>=1.0.0",
+    "bruker-powderxrd-parser>=0.1.0",
 ]
 
 [dependency-groups]
