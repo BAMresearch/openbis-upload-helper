@@ -157,6 +157,12 @@ The build order is:
 uv run pyinstaller \
   --onefile \
   --name openbis-helper-python \
+  --collect-all bam_masterdata \
+  --collect-all openbis_parser_example \
+  --collect-all bruker_powderxrd_parser \
+  --copy-metadata bam-masterdata \
+  --copy-metadata openbis-parser-example \
+  --copy-metadata bruker-powderxrd-parser \
   src/openbis_upload_helper/main.py
 ```
 

@@ -27,7 +27,7 @@ wheels = [
 
 [[package]]
 name = "bam-masterdata"
-version = "0.13.1"
+version = "0.13.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -41,9 +41,9 @@ dependencies = [
     { name = "rdflib" },
     { name = "structlog" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/43/f2/c95e47a67cd70bb8286ddf8f8528a43a67ad3dacae1fb5d53977f24a709c/bam_masterdata-0.13.1.tar.gz", hash = "sha256:42456ce253a03a07ad6761419fce9ab34263675f2adf8f48ef5ad96d44dd31c5", size = 2353145, upload-time = "2026-09-07T15:49:15.281Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a8/95/a424b055e9ac316e027889bf338c17bc20ee876bde49f84925a012746cc3/bam_masterdata-0.13.2.tar.gz", hash = "sha256:7049cfa4a4db0b1206de37466c0a9056e89e96eead6bd0b085484ed95c977f2b", size = 2353655, upload-time = "2026-09-15T12:25:48.008Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2a/16/5e438da980e52a50adca49421e821b379ba5bf7b0ab203183d54c1c347c6/bam_masterdata-0.13.1-py3-none-any.whl", hash = "sha256:43b8640e55a14b937e723fcae9617462d0ecf2c4c93650c127bd9b43c95cf3d8", size = 553174, upload-time = "2026-09-07T15:49:13.963Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/03/a4d7e0fe13df07e6aeca62be369a17457415809b96b6d4eb35f996d79002/bam_masterdata-0.13.2-py3-none-any.whl", hash = "sha256:d6b9c3ca88a7c5e11bba7819a3a472a63be23563262aacb2c8eb6c80552d23ab", size = 553591, upload-time = "2026-09-15T12:25:46.609Z" },
 ]
 
 [[package]]
@@ -581,7 +581,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "bam-masterdata", specifier = ">=0.13.0" },
+    { name = "bam-masterdata", specifier = ">=0.13.2" },
     { name = "bruker-powderxrd-parser", specifier = ">=0.1.0" },
     { name = "openbis-parser-example", specifier = ">=1.0.0" },
     { name = "pybis", specifier = ">=1.37.5" },
