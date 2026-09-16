@@ -85,6 +85,22 @@ export async function listenToProcessingEvents(
 }
 
 
+export async function listenToLogExportErrors(
+  onError: (
+    message: string,
+  ) => void,
+): Promise<UnlistenFn> {
+  return listen<string>(
+    "processing-log-export-error",
+    (event) => {
+      onError(
+        event.payload,
+      );
+    },
+  );
+}
+
+
 export async function saveProcessingLogs(
   fileName: string,
   content: string,

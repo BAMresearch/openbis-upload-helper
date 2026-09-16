@@ -16,6 +16,7 @@ import {
 import {
   cancelProcessing,
   listenToProcessingEvents,
+  listenToLogExportErrors,
   processSources,
   saveProcessingLogs,
 } from "./processing";
@@ -236,6 +237,37 @@ export function ProcessingReview({
     };
   }, []);
 
+  useEffect(() => {
+    let unlisten:
+      (() => void) | undefined;
+
+    let disposed = false;
+
+    listenToLogExportErrors(
+      (message) => {
+        if (!disposed) {
+          setError(
+            message,
+          );
+        }
+      },
+    ).then(
+      (cleanup) => {
+        if (disposed) {
+          cleanup();
+          return;
+        }
+
+        unlisten =
+          cleanup;
+      },
+    );
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
 
   useEffect(() => {
     logEndRef.current

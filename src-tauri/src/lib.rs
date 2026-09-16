@@ -1372,6 +1372,9 @@ fn save_processing_logs(
 ) -> Result<(), String> {
     use tauri_plugin_dialog::DialogExt;
 
+    let export_app =
+        app.clone();
+
     app
         .dialog()
         .file()
@@ -1398,9 +1401,13 @@ fn save_processing_logs(
                             path,
 
                         Err(error) => {
-                            eprintln!(
-                                "Could not resolve selected log file path: {error}"
-                            );
+                            let _ =
+                                export_app.emit(
+                                    "processing-log-export-error",
+                                    format!(
+                                        "Could not resolve the selected log file path: {error}"
+                                    ),
+                                );
 
                             return;
                         }
@@ -1412,9 +1419,13 @@ fn save_processing_logs(
                         content,
                     )
                 {
-                    eprintln!(
-                        "Failed to save processing logs: {error}"
-                    );
+                    let _ =
+                        export_app.emit(
+                            "processing-log-export-error",
+                            format!(
+                                "Could not save the processing logs: {error}"
+                            ),
+                        );
                 }
             },
         );
