@@ -36,13 +36,39 @@ pub fn kill_processing_child(
     {
         let mut child = child;
 
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                return Ok(());
+            }
+
+            Ok(None) => {}
+
+            Err(error) => {
+                return Err(
+                    format!(
+                        "Failed to inspect Python backend: {error}"
+                    ),
+                );
+            }
+        }
+
         child
             .kill()
             .map_err(|error| {
                 format!(
                     "Failed to stop Python backend: {error}"
                 )
-            })
+            })?;
+
+        child
+            .wait()
+            .map_err(|error| {
+                format!(
+                    "Failed to reap Python backend: {error}"
+                )
+            })?;
+
+        Ok(())
     }
 
     #[cfg(not(debug_assertions))]

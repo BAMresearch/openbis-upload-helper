@@ -16,7 +16,10 @@ use std::io::{
     BufReader,
     Write,
 };
-use tauri::Emitter;
+use tauri::{
+    Emitter,
+    Manager,
+};
 #[cfg(debug_assertions)]
 use std::process::Stdio;
 use std::sync::{
@@ -295,29 +298,33 @@ fn run_processing_command(
 
 
     /*
-     * Store the actual Python process in AppState.
-     * cancel_processing() can now terminate it.
-     */
+    * Store the actual Python process in AppState.
+    * cancel_processing() can now terminate it.
+    */
     {
-        let mut processing = processing_state
-            .lock()
-            .map_err(|_| {
-                "Failed to access processing state."
-            })?;
+        let mut processing =
+            processing_state
+                .lock()
+                .map_err(|_| {
+                    "Failed to access processing state."
+                })?;
 
-        processing.child = Some(child);
-
+        processing.child =
+            Some(child);
 
         /*
-         * Cancellation may have been requested during
-         * the short interval between starting the
-         * operation and storing the child.
-         */
+        * Cancellation or application shutdown may
+        * have been requested while the child was
+        * being started.
+        */
         if processing.cancel_requested {
             if let Some(child) =
-                processing.child.as_mut()
+                processing.child.take()
             {
-                let _ = child.kill();
+                let _ =
+                    backend::kill_processing_child(
+                        child,
+                    );
             }
         }
     }
@@ -328,6 +335,9 @@ fn run_processing_command(
      * cannot block the Python process.
      */
     let stderr_app = app.clone();
+
+    let stderr_processing_state =
+        processing_state.clone();
 
     let stderr_thread =
         std::thread::spawn(
@@ -362,6 +372,19 @@ fn run_processing_command(
 
                     collected.push('\n');
 
+                    let cancelled =
+                        stderr_processing_state
+                            .lock()
+                            .map(
+                                |processing| {
+                                    processing.cancel_requested
+                                },
+                            )
+                            .unwrap_or(false);
+
+                    if cancelled {
+                        continue;
+                    }
 
                     let event =
                         ProcessingEvent {
@@ -527,62 +550,41 @@ fn run_processing_command(
     }
 
 
-    /*
-     * stdout closes when Python exits, including
-     * when it was killed by cancel_processing().
-     */
-    let mut child = {
-        let mut processing = processing_state
-            .lock()
-            .map_err(|_| {
-                "Failed to access processing state."
-            })?;
+    let child = {
+        let mut processing =
+            processing_state
+                .lock()
+                .map_err(|_| {
+                    "Failed to access processing state."
+                })?;
 
-        processing
-            .child
-            .take()
-            .ok_or(
-                "Processing child process was unexpectedly missing.",
-            )?
+        processing.child.take()
     };
 
-
-    let status =
-        child.wait().map_err(
-            |error| {
-                format!(
-                    "Python processing backend failed: {error}"
-                )
-            },
-        )?;
-
-
-    let stderr_output =
-        stderr_thread
-            .join()
-            .unwrap_or_else(
-                |_| {
-                    "Failed to read Python stderr."
-                        .to_string()
-                },
-            );
-
-
     let cancelled = {
-        let processing = processing_state
-            .lock()
-            .map_err(|_| {
-                "Failed to access processing state."
-            })?;
+        let processing =
+            processing_state
+                .lock()
+                .map_err(|_| {
+                    "Failed to access processing state."
+                })?;
 
         processing.cancel_requested
     };
 
-
-    /*
-     * Cancellation is a separate outcome from failure.
-     */
     if cancelled {
+        /*
+        * cancel_processing() may already have taken,
+        * killed and reaped the child.
+        */
+        if let Some(mut child) = child {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+
+        let _ =
+            stderr_thread.join();
+
         return Ok(
             ProcessResult {
                 success: false,
@@ -593,6 +595,30 @@ fn run_processing_command(
             },
         );
     }
+
+    let mut child =
+        child.ok_or(
+            "Processing child process was unexpectedly missing.",
+        )?;
+
+    let status =
+        child
+            .wait()
+            .map_err(|error| {
+                format!(
+                    "Python processing backend failed: {error}"
+                )
+            })?;
+
+    let stderr_output =
+        stderr_thread
+            .join()
+            .unwrap_or_else(
+                |_| {
+                    "Failed to read Python stderr."
+                        .to_string()
+                },
+            );
 
 
     if !status.success() {
@@ -873,6 +899,22 @@ fn run_processing_command(
 
                         stderr_output
                             .push('\n');
+
+
+                        let cancelled =
+                            processing_state
+                                .lock()
+                                .map(
+                                    |processing| {
+                                        processing.cancel_requested
+                                    },
+                                )
+                                .unwrap_or(false);
+
+                        if cancelled {
+                            continue;
+                        }
+
 
                         let event =
                             ProcessingEvent {
@@ -1269,14 +1311,9 @@ fn cancel_processing(
                 "Failed to access processing state."
             })?;
 
-
         if !processing.running {
-            return Err(
-                "No processing operation is running."
-                    .to_string(),
-            );
+            return Ok(());
         }
-
 
         processing.cancel_requested = true;
 
@@ -1499,36 +1536,154 @@ async fn process_sources(
     result
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    tauri::Builder::default()
-        .manage(AppState {
-            auth: Mutex::new(None),
+fn cleanup_processing_on_exit(
+    app: &tauri::AppHandle,
+) {
+    let state =
+        app.state::<AppState>();
 
-            processing: Arc::new(
-                Mutex::new(
-                    ProcessingState {
-                        running: false,
-                        cancel_requested: false,
-                        child: None,
-                    },
-                ),
+    /*
+     * First mark the operation as intentionally
+     * cancelled. A processing worker that has not
+     * registered its child yet will see this flag
+     * as soon as it does so.
+     */
+    {
+        let mut processing =
+            match state.processing.lock() {
+                Ok(processing) =>
+                    processing,
+
+                Err(_) =>
+                    return,
+            };
+
+        if !processing.running {
+            return;
+        }
+
+        processing.cancel_requested =
+            true;
+    }
+
+
+    /*
+     * There is a very small interval between
+     * spawning the backend and registering its
+     * child handle in ProcessingState.
+     *
+     * During shutdown, wait briefly for that
+     * registration rather than allowing the
+     * backend to become orphaned.
+     */
+    for _ in 0..40 {
+        let child = {
+            let mut processing =
+                match state.processing.lock() {
+                    Ok(processing) =>
+                        processing,
+
+                    Err(_) =>
+                        return,
+                };
+
+            if !processing.running {
+                return;
+            }
+
+            processing.child.take()
+        };
+
+
+        if let Some(child) = child {
+            let _ =
+                backend::kill_processing_child(
+                    child,
+                );
+
+            return;
+        }
+
+
+        std::thread::sleep(
+            std::time::Duration::from_millis(
+                25,
             ),
-        })
-        .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![
-            login,
-            get_spaces,
-            get_projects,
-            get_collections,
-            get_parsers,
-            process_sources,
-            cancel_processing,
-            save_processing_logs,
-            source::scan_sources,
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        );
+    }
+}
+
+#[cfg_attr(
+    mobile,
+    tauri::mobile_entry_point
+)]
+pub fn run() {
+    let app =
+        tauri::Builder::default()
+            .manage(
+                AppState {
+                    auth:
+                        Mutex::new(
+                            None,
+                        ),
+
+                    processing:
+                        Arc::new(
+                            Mutex::new(
+                                ProcessingState {
+                                    running:
+                                        false,
+
+                                    cancel_requested:
+                                        false,
+
+                                    child:
+                                        None,
+                                },
+                            ),
+                        ),
+                },
+            )
+            .plugin(
+                tauri_plugin_opener::init(),
+            )
+            .plugin(
+                tauri_plugin_dialog::init(),
+            )
+            .plugin(
+                tauri_plugin_shell::init(),
+            )
+            .invoke_handler(
+                tauri::generate_handler![
+                    login,
+                    get_spaces,
+                    get_projects,
+                    get_collections,
+                    get_parsers,
+                    process_sources,
+                    cancel_processing,
+                    save_processing_logs,
+                    source::scan_sources,
+                ],
+            )
+            .build(
+                tauri::generate_context!(),
+            )
+            .expect(
+                "error while building tauri application",
+            );
+
+
+    app.run(
+        |app_handle, event| {
+            if let tauri::RunEvent::ExitRequested {
+                ..
+            } = event
+            {
+                cleanup_processing_on_exit(
+                    app_handle,
+                );
+            }
+        },
+    );
 }
