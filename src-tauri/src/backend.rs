@@ -185,16 +185,9 @@ fn run_development(
             })?;
 
     if !output.status.success() {
-        let stderr =
-            String::from_utf8_lossy(
-                &output.stderr,
-            );
-
         return Err(
-            format!(
-                "Python backend failed: {}",
-                stderr.trim(),
-            ),
+            "The application backend failed unexpectedly."
+                .to_string(),
         );
     }
 
@@ -312,27 +305,11 @@ fn run_sidecar(
     );
 
     if exit_code != Some(0) {
-        let stderr_text =
-            String::from_utf8_lossy(
-                &stderr,
-            );
-
-        if stderr_text
-            .trim()
-            .is_empty()
-        {
-            return Err(
-                format!(
-                    "Python sidecar exited with code {:?}.",
-                    exit_code,
-                ),
-            );
-        }
-
         return Err(
             format!(
-                "Python sidecar failed: {}",
-                stderr_text.trim(),
+                "The application backend exited unexpectedly \
+                with code {:?}.",
+                exit_code,
             ),
         );
     }

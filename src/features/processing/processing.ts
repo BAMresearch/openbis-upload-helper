@@ -86,13 +86,13 @@ export async function listenToProcessingEvents(
 
 
 export async function saveProcessingLogs(
-  path: string,
+  fileName: string,
   content: string,
 ): Promise<void> {
   await invoke(
     "save_processing_logs",
     {
-      path,
+      fileName,
       content,
     },
   );

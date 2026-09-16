@@ -1365,52 +1365,61 @@ fn get_parsers(
 }
 
 #[tauri::command]
-async fn save_processing_logs(
+fn save_processing_logs(
     app: tauri::AppHandle,
     file_name: String,
     content: String,
-) -> Result<bool, String> {
+) -> Result<(), String> {
     use tauri_plugin_dialog::DialogExt;
 
-    let file_path =
-        app
-            .dialog()
-            .file()
-            .set_file_name(
-                &file_name,
-            )
-            .add_filter(
-                "JSON",
-                &["json"],
-            )
-            .blocking_save_file();
-
-    let Some(file_path) =
-        file_path
-    else {
-        return Ok(false);
-    };
-
-    let path =
-        file_path
-            .into_path()
-            .map_err(|error| {
-                format!(
-                    "Could not resolve selected log file path: {error}"
-                )
-            })?;
-
-    std::fs::write(
-        &path,
-        content,
-    )
-    .map_err(|error| {
-        format!(
-            "Failed to save processing logs: {error}"
+    app
+        .dialog()
+        .file()
+        .set_file_name(
+            &file_name,
         )
-    })?;
+        .add_filter(
+            "JSON",
+            &["json"],
+        )
+        .save_file(
+            move |file_path| {
+                let Some(file_path) =
+                    file_path
+                else {
+                    return;
+                };
 
-    Ok(true)
+                let path =
+                    match file_path
+                        .into_path()
+                    {
+                        Ok(path) =>
+                            path,
+
+                        Err(error) => {
+                            eprintln!(
+                                "Could not resolve selected log file path: {error}"
+                            );
+
+                            return;
+                        }
+                    };
+
+                if let Err(error) =
+                    std::fs::write(
+                        &path,
+                        content,
+                    )
+                {
+                    eprintln!(
+                        "Failed to save processing logs: {error}"
+                    );
+                }
+            },
+        );
+
+    Ok(())
 }
 
 #[tauri::command]

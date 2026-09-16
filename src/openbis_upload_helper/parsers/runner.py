@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from openbis_upload_helper.client.openbis import (
     AuthRequest,
     get_authenticated_openbis,
+    openbis_error_message,
 )
 from openbis_upload_helper.parsers.registry import discover_parsers
 
@@ -124,6 +125,7 @@ def run_parsers(
     The complete operation remains inside one isolated
     Python process.
     """
+    current_stage = "validation"
     try:
         logger.info(
             "Validating processing plan.",
@@ -151,9 +153,8 @@ def run_parsers(
             stage="openbis",
         )
 
-        openbis = get_authenticated_openbis(
-            request,
-        )
+        current_stage = "openbis"
+        openbis = get_authenticated_openbis(request)
 
         logger.info(
             "Initializing processing.",
@@ -161,6 +162,7 @@ def run_parsers(
             stage="initialization",
         )
 
+        current_stage = "initialization"
         runner = RunParsers(
             openbis=openbis,
             space_name=request.space,
@@ -176,6 +178,7 @@ def run_parsers(
             stage="processing",
         )
 
+        current_stage = "processing"
         runner.run()
 
         logger.info(
@@ -193,14 +196,45 @@ def run_parsers(
         )
 
     except Exception as exc:
+        if current_stage == "validation" and isinstance(exc, ValueError):
+            message = str(exc)
+
+        elif current_stage == "openbis":
+            message = openbis_error_message(
+                exc,
+                fallback=("Could not connect to openBIS for processing."),
+            )
+
+        elif current_stage == "initialization":
+            message = openbis_error_message(
+                exc,
+                fallback=(
+                    "Could not initialize "
+                    "the selected openBIS "
+                    "destination. Check that "
+                    "you have permission to "
+                    "create or use the project "
+                    "and collection."
+                ),
+            )
+
+        else:
+            message = openbis_error_message(
+                exc,
+                fallback=(
+                    "Parser processing failed. "
+                    "Check the selected files "
+                    "and parser assignment."
+                ),
+            )
+
         logger.error(
-            "Processing failed.",
+            message,
             kind="stage",
             stage="failed",
-            error=str(exc),
         )
 
         return ProcessResult(
             success=False,
-            error=f"Processing failed: {exc}",
+            error=message,
         )

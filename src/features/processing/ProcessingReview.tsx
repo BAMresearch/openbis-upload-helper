@@ -509,6 +509,14 @@ export function ProcessingReview({
                     space,
                     project,
                     collection,
+                  ).catch(
+                    (error) => {
+                      setError(
+                        error instanceof Error
+                          ? error.message
+                          : String(error),
+                      );
+                    },
                   );
                 }}
               >
