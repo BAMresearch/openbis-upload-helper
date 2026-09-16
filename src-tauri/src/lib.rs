@@ -205,62 +205,13 @@ struct ProcessingEvent {
 }
 
 
-fn run_python_command(command_name: &str, payload: &str) -> Result<Vec<u8>, String> {
-    let mut child =
-        backend::command(command_name)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|error| {
-                format!(
-                    "Failed to start Python backend: {error}"
-                )
-            })?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(payload.as_bytes())
-            .map_err(|error| {
-                format!(
-                    "Failed to send data to Python backend: {error}"
-                )
-            })?;
-    }
-
-    let output =
-        child
-            .wait_with_output()
-            .map_err(|error| {
-                format!(
-                    "Python backend failed: {error}"
-                )
-            })?;
-
-    if !output.status.success() {
-        let stderr =
-            String::from_utf8_lossy(
-                &output.stderr,
-            );
-
-        return Err(
-            format!(
-                "Python backend failed: {stderr}"
-            ),
-        );
-    }
-
-    Ok(output.stdout)
-}
-
-
 fn run_processing_command(
     app: &tauri::AppHandle,
     processing_state: &Arc<Mutex<ProcessingState>>,
     payload: &str,
 ) -> Result<ProcessResult, String> {
     let mut child =
-        backend::command("process");
+        backend::development_command("process");
 
     let mut child = child
         .env("PYTHONUNBUFFERED", "1")
@@ -657,6 +608,7 @@ fn run_processing_command(
 
 #[tauri::command]
 async fn login(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     server_url: String,
     username: String,
@@ -685,10 +637,14 @@ async fn login(
      * performs network requests. Run the blocking
      * Python process away from the Tauri UI thread.
      */
+    let backend_app =
+        app.clone();
+
     let output =
         tauri::async_runtime::spawn_blocking(
             move || {
-                run_python_command(
+                backend::run(
+                    &backend_app,
                     "login",
                     &payload,
                 )
@@ -756,7 +712,10 @@ async fn login(
 }
 
 #[tauri::command]
-fn get_spaces(state: tauri::State<AppState>) -> Result<SpacesResult, String> {
+fn get_spaces(
+    app: tauri::AppHandle,
+    state: tauri::State<AppState>,
+) -> Result<SpacesResult, String> {
     let auth = {
         let stored_auth = state
             .auth
@@ -768,14 +727,22 @@ fn get_spaces(state: tauri::State<AppState>) -> Result<SpacesResult, String> {
 
     let payload = serde_json::to_string(&auth).map_err(|error| error.to_string())?;
 
-    let output = run_python_command("spaces", &payload)?;
+    let output =
+        backend::run(
+            &app,
+            "spaces",
+            &payload,
+        )?;
 
     serde_json::from_slice::<SpacesResult>(&output)
         .map_err(|error| format!("Invalid response from Python backend: {error}"))
 }
 
 #[tauri::command]
-fn get_projects(state: tauri::State<AppState>, space: String) -> Result<ProjectsResult, String> {
+fn get_projects(
+    app: tauri::AppHandle,
+    state: tauri::State<AppState>, space: String,
+) -> Result<ProjectsResult, String> {
     let auth = {
         let stored_auth = state
             .auth
@@ -793,7 +760,12 @@ fn get_projects(state: tauri::State<AppState>, space: String) -> Result<Projects
 
     let payload = serde_json::to_string(&request).map_err(|error| error.to_string())?;
 
-    let output = run_python_command("projects", &payload)?;
+    let output =
+        backend::run(
+            &app,
+            "projects",
+            &payload,
+        )?;
 
     serde_json::from_slice::<ProjectsResult>(&output)
         .map_err(|error| format!("Invalid response from Python backend: {error}"))
@@ -801,6 +773,7 @@ fn get_projects(state: tauri::State<AppState>, space: String) -> Result<Projects
 
 #[tauri::command]
 fn get_collections(
+    app: tauri::AppHandle,
     state: tauri::State<AppState>,
     space: String,
     project: String,
@@ -823,16 +796,24 @@ fn get_collections(
 
     let payload = serde_json::to_string(&request).map_err(|error| error.to_string())?;
 
-    let output = run_python_command("collections", &payload)?;
+    let output =
+        backend::run(
+            &app,
+            "collections",
+            &payload,
+        )?;
 
     serde_json::from_slice::<CollectionsResult>(&output)
         .map_err(|error| format!("Invalid response from Python backend: {error}"))
 }
 
 #[tauri::command]
-fn get_parsers() -> Result<ParsersResult, String> {
+fn get_parsers(
+    app: tauri::AppHandle,
+) -> Result<ParsersResult, String> {
     let output =
-        run_python_command(
+        backend::run(
+            &app,
             "parsers",
             "",
         )?;
