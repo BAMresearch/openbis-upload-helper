@@ -10,16 +10,25 @@ mod backend;
 mod source;
 
 use serde::{Deserialize, Serialize};
+#[cfg(debug_assertions)]
 use std::io::{
     BufRead,
     BufReader,
     Write,
 };
 use tauri::Emitter;
+#[cfg(debug_assertions)]
 use std::process::Stdio;
 use std::sync::{
     Arc,
     Mutex,
+};
+
+
+#[cfg(not(debug_assertions))]
+use tauri_plugin_shell::{
+    process::CommandEvent,
+    ShellExt,
 };
 
 #[derive(Debug, Serialize)]
@@ -55,7 +64,7 @@ struct AuthState {
 struct ProcessingState {
     running: bool,
     cancel_requested: bool,
-    child: Option<std::process::Child>,
+    child: Option<backend::ProcessingChild>,
 }
 
 struct AppState {
@@ -205,13 +214,41 @@ struct ProcessingEvent {
 }
 
 
+#[cfg(debug_assertions)]
 fn run_processing_command(
     app: &tauri::AppHandle,
     processing_state: &Arc<Mutex<ProcessingState>>,
     payload: &str,
 ) -> Result<ProcessResult, String> {
+    let repository_root =
+        std::path::Path::new(
+            env!("CARGO_MANIFEST_DIR"),
+        )
+        .parent()
+        .expect(
+            "src-tauri should have a parent directory",
+        );
+
+    #[cfg(target_os = "windows")]
+    let executable =
+        repository_root
+            .join(".venv")
+            .join("Scripts")
+            .join("openbis-upload-helper.exe");
+
+    #[cfg(not(target_os = "windows"))]
+    let executable =
+        repository_root
+            .join(".venv")
+            .join("bin")
+            .join("openbis-upload-helper");
+
     let mut child =
-        backend::development_command("process");
+        std::process::Command::new(
+            executable,
+        );
+
+    child.arg("process");
 
     let mut child = child
         .env("PYTHONUNBUFFERED", "1")
@@ -606,6 +643,383 @@ fn run_processing_command(
 }
 
 
+#[cfg(not(debug_assertions))]
+fn run_processing_command(
+    app: &tauri::AppHandle,
+    processing_state: &Arc<Mutex<ProcessingState>>,
+    payload: &str,
+) -> Result<ProcessResult, String> {
+    let command =
+        app
+            .shell()
+            .sidecar(
+                "openbis-helper-python",
+            )
+            .map_err(|error| {
+                format!(
+                    "Could not resolve Python sidecar: {error}"
+                )
+            })?
+            .arg("process")
+            .env(
+                "PYTHONUNBUFFERED",
+                "1",
+            );
+
+    let (mut receiver, mut child) =
+        command
+            .spawn()
+            .map_err(|error| {
+                format!(
+                    "Failed to start Python processing sidecar: {error}"
+                )
+            })?;
+
+    let mut request =
+        payload.as_bytes().to_vec();
+
+    request.push(b'\n');
+
+    child
+        .write(&request)
+        .map_err(|error| {
+            format!(
+                "Failed to send processing request to Python sidecar: {error}"
+            )
+        })?;
+
+    {
+        let mut processing =
+            processing_state
+                .lock()
+                .map_err(|_| {
+                    "Failed to access processing state."
+                        .to_string()
+                })?;
+
+        processing.child =
+            Some(child);
+
+        if processing.cancel_requested {
+            if let Some(child) =
+                processing.child.take()
+            {
+                let _ =
+                    backend::kill_processing_child(
+                        child,
+                    );
+            }
+        }
+    }
+
+    let mut final_result:
+        Option<PythonProcessResult> =
+        None;
+
+    let mut stderr_output =
+        String::new();
+
+    let mut exit_code:
+        Option<i32> =
+        None;
+
+    tauri::async_runtime::block_on(
+        async {
+            while let Some(event) =
+                receiver.recv().await
+            {
+                match event {
+                    CommandEvent::Stdout(
+                        bytes,
+                    ) => {
+                        let line =
+                            String::from_utf8_lossy(
+                                &bytes,
+                            )
+                            .to_string();
+
+                        if line
+                            .trim()
+                            .is_empty()
+                        {
+                            continue;
+                        }
+
+                        let python_event =
+                            match serde_json::from_str::<
+                                PythonProcessingEvent,
+                            >(&line)
+                            {
+                                Ok(event) =>
+                                    event,
+
+                                Err(error) => {
+                                    let event =
+                                        ProcessingEvent {
+                                            kind:
+                                                "log".to_string(),
+
+                                            level:
+                                                "error".to_string(),
+
+                                            message:
+                                                format!(
+                                                    "Invalid processing event ({error}): {line}"
+                                                ),
+
+                                            timestamp:
+                                                None,
+
+                                            stage:
+                                                None,
+
+                                            files:
+                                                None,
+
+                                            jobs:
+                                                None,
+                                        };
+
+                                    let _ =
+                                        app.emit(
+                                            "processing-event",
+                                            event,
+                                        );
+
+                                    continue;
+                                }
+                            };
+
+                        if python_event
+                            .kind
+                            .as_deref()
+                            == Some(
+                                "result",
+                            )
+                        {
+                            final_result =
+                                python_event
+                                    .result;
+
+                            continue;
+                        }
+
+                        let event =
+                            ProcessingEvent {
+                                kind:
+                                    python_event
+                                        .kind
+                                        .unwrap_or_else(
+                                            || {
+                                                "log".to_string()
+                                            },
+                                        ),
+
+                                level:
+                                    python_event
+                                        .level
+                                        .unwrap_or_else(
+                                            || {
+                                                "info".to_string()
+                                            },
+                                        ),
+
+                                message:
+                                    python_event
+                                        .event
+                                        .unwrap_or_else(
+                                            || {
+                                                line.clone()
+                                            },
+                                        ),
+
+                                timestamp:
+                                    python_event
+                                        .timestamp,
+
+                                stage:
+                                    python_event
+                                        .stage,
+
+                                files:
+                                    python_event
+                                        .files,
+
+                                jobs:
+                                    python_event
+                                        .jobs,
+                            };
+
+                        let _ =
+                            app.emit(
+                                "processing-event",
+                                event,
+                            );
+                    }
+
+                    CommandEvent::Stderr(
+                        bytes,
+                    ) => {
+                        let line =
+                            String::from_utf8_lossy(
+                                &bytes,
+                            )
+                            .to_string();
+
+                        stderr_output
+                            .push_str(
+                                &line,
+                            );
+
+                        stderr_output
+                            .push('\n');
+
+                        let event =
+                            ProcessingEvent {
+                                kind:
+                                    "log".to_string(),
+
+                                level:
+                                    "error".to_string(),
+
+                                message:
+                                    line,
+
+                                timestamp:
+                                    None,
+
+                                stage:
+                                    None,
+
+                                files:
+                                    None,
+
+                                jobs:
+                                    None,
+                            };
+
+                        let _ =
+                            app.emit(
+                                "processing-event",
+                                event,
+                            );
+                    }
+
+                    CommandEvent::Error(
+                        error,
+                    ) => {
+                        stderr_output
+                            .push_str(
+                                &error,
+                            );
+
+                        stderr_output
+                            .push('\n');
+                    }
+
+                    CommandEvent::Terminated(
+                        terminated,
+                    ) => {
+                        exit_code =
+                            terminated.code;
+
+                        break;
+                    }
+
+                    _ => {}
+                }
+            }
+        },
+    );
+
+    let cancelled = {
+        let processing =
+            processing_state
+                .lock()
+                .map_err(|_| {
+                    "Failed to access processing state."
+                })?;
+
+        processing
+            .cancel_requested
+    };
+
+    {
+        let mut processing =
+            processing_state
+                .lock()
+                .map_err(|_| {
+                    "Failed to access processing state."
+                })?;
+
+        /*
+         * The process has already terminated.
+         * Remove any remaining handle.
+         */
+        processing.child.take();
+    }
+
+    if cancelled {
+        return Ok(
+            ProcessResult {
+                success: false,
+                cancelled: true,
+                processed_files: 0,
+                jobs: 0,
+                error: None,
+            },
+        );
+    }
+
+    if exit_code != Some(0) {
+        if stderr_output
+            .trim()
+            .is_empty()
+        {
+            return Err(
+                format!(
+                    "Python processing sidecar exited with code {:?}.",
+                    exit_code,
+                ),
+            );
+        }
+
+        return Err(
+            format!(
+                "Python processing sidecar failed: {}",
+                stderr_output.trim(),
+            ),
+        );
+    }
+
+    let python_result =
+        final_result.ok_or(
+            "Python processing sidecar finished without returning a final result.",
+        )?;
+
+    Ok(
+        ProcessResult {
+            success:
+                python_result.success,
+
+            cancelled:
+                false,
+
+            processed_files:
+                python_result
+                    .processed_files,
+
+            jobs:
+                python_result.jobs,
+
+            error:
+                python_result.error,
+        },
+    )
+}
+
+
+
 #[tauri::command]
 async fn login(
     app: tauri::AppHandle,
@@ -868,15 +1282,16 @@ fn cancel_processing(
 
 
         if let Some(child) =
-            processing.child.as_mut()
+            processing.child.take()
         {
-            child
-                .kill()
-                .map_err(|error| {
-                    format!(
-                        "Failed to cancel processing: {error}"
-                    )
-                })?;
+            backend::kill_processing_child(
+                child,
+            )
+            .map_err(|error| {
+                format!(
+                    "Failed to cancel processing: {error}"
+                )
+            })?;
         }
     }
 
@@ -1059,15 +1474,22 @@ async fn process_sources(
                     "Failed to access processing state."
                 })?;
 
-
-        if let Some(
-            mut child,
-        ) = processing.child.take()
+        if let Some(child) =
+            processing.child.take()
         {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
+            #[cfg(debug_assertions)]
+            {
+                let mut child = child;
 
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+
+            #[cfg(not(debug_assertions))]
+            {
+                let _ = child.kill();
+            }
+        }
 
         processing.running = false;
         processing.cancel_requested = false;

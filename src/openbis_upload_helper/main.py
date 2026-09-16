@@ -29,7 +29,7 @@ def read_payload(input_file: str | None) -> str:
         with open(input_file, encoding="utf-8") as file:
             return file.read()
 
-    return sys.stdin.read()
+    return sys.stdin.readline()
 
 
 def main() -> None:

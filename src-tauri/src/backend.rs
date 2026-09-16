@@ -8,6 +8,15 @@ use tauri_plugin_shell::ShellExt;
 
 
 #[cfg(debug_assertions)]
+pub type ProcessingChild =
+    std::process::Child;
+
+#[cfg(not(debug_assertions))]
+pub type ProcessingChild =
+    tauri_plugin_shell::process::CommandChild;
+
+
+#[cfg(debug_assertions)]
 fn repository_root() -> PathBuf {
     std::path::Path::new(
         env!("CARGO_MANIFEST_DIR"),
@@ -17,6 +26,35 @@ fn repository_root() -> PathBuf {
         "src-tauri should have a parent directory",
     )
     .to_path_buf()
+}
+
+
+pub fn kill_processing_child(
+    child: ProcessingChild,
+) -> Result<(), String> {
+    #[cfg(debug_assertions)]
+    {
+        let mut child = child;
+
+        child
+            .kill()
+            .map_err(|error| {
+                format!(
+                    "Failed to stop Python backend: {error}"
+                )
+            })
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        child
+            .kill()
+            .map_err(|error| {
+                format!(
+                    "Failed to stop Python sidecar: {error}"
+                )
+            })
+    }
 }
 
 
@@ -144,7 +182,9 @@ fn run_sidecar(
     command_name: &str,
     payload: &str,
 ) -> Result<Vec<u8>, String> {
-    let sidecar =
+    use tauri_plugin_shell::process::CommandEvent;
+
+    let command =
         app
             .shell()
             .sidecar(
@@ -157,34 +197,119 @@ fn run_sidecar(
             })?
             .arg(command_name);
 
+    let (mut receiver, mut child) =
+        command
+            .spawn()
+            .map_err(|error| {
+                format!(
+                    "Failed to start Python sidecar: {error}"
+                )
+            })?;
+
     /*
-     * For simple request/response operations,
-     * use the shell plugin's output() helper.
+     * Commands such as login/spaces/projects/collections
+     * receive one JSON request line.
      *
-     * stdin support requires us to spawn the
-     * child explicitly, which we will add below.
+     * `parsers` has no payload and therefore does not
+     * need anything written to stdin.
      */
+    if !payload.is_empty() {
+        let mut request =
+            payload.as_bytes().to_vec();
 
-    let _ = payload;
+        request.push(b'\n');
 
-    Err(
-        "Production backend stdin handling \
-         is not implemented yet."
-            .to_string(),
-    )
-}
+        child
+            .write(&request)
+            .map_err(|error| {
+                format!(
+                    "Failed to send data to Python sidecar: {error}"
+                )
+            })?;
+    }
 
+    let mut stdout =
+        Vec::<u8>::new();
 
-#[cfg(debug_assertions)]
-pub fn development_command(
-    command_name: &str,
-) -> std::process::Command {
-    let mut command =
-        std::process::Command::new(
-            development_backend_executable(),
+    let mut stderr =
+        Vec::<u8>::new();
+
+    let mut exit_code:
+        Option<i32> =
+        None;
+
+    tauri::async_runtime::block_on(
+        async {
+            while let Some(event) =
+                receiver.recv().await
+            {
+                match event {
+                    CommandEvent::Stdout(
+                        bytes,
+                    ) => {
+                        stdout.extend(
+                            bytes,
+                        );
+                    }
+
+                    CommandEvent::Stderr(
+                        bytes,
+                    ) => {
+                        stderr.extend(
+                            bytes,
+                        );
+                    }
+
+                    CommandEvent::Error(
+                        error,
+                    ) => {
+                        stderr.extend(
+                            error.as_bytes(),
+                        );
+
+                        stderr.push(b'\n');
+                    }
+
+                    CommandEvent::Terminated(
+                        terminated,
+                    ) => {
+                        exit_code =
+                            terminated.code;
+
+                        break;
+                    }
+
+                    _ => {}
+                }
+            }
+        },
+    );
+
+    if exit_code != Some(0) {
+        let stderr_text =
+            String::from_utf8_lossy(
+                &stderr,
+            );
+
+        if stderr_text
+            .trim()
+            .is_empty()
+        {
+            return Err(
+                format!(
+                    "Python sidecar exited with code {:?}.",
+                    exit_code,
+                ),
+            );
+        }
+
+        return Err(
+            format!(
+                "Python sidecar failed: {}",
+                stderr_text.trim(),
+            ),
         );
+    }
 
-    command.arg(command_name);
-
-    command
+    Ok(stdout)
 }
