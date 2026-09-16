@@ -2,6 +2,7 @@
 name = "openbis-upload-helper"
 version = "1.0.0"
 description = "Desktop helper for parsing and uploading scientific data to openBIS."
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

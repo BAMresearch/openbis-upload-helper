@@ -6,6 +6,7 @@
 // For production:
 //   Python will be bundled as a sidecar and invoked instead.
 
+mod backend;
 mod source;
 
 use serde::{Deserialize, Serialize};
