@@ -16,7 +16,7 @@ use std::io::{
     Write,
 };
 use tauri::Emitter;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::{
     Arc,
     Mutex,
@@ -205,68 +205,52 @@ struct ProcessingEvent {
 }
 
 
-fn run_python_command(command: &str, payload: &str) -> Result<Vec<u8>, String> {
-    let mut child = Command::new("uv") // Development only; Replace this with the bundled Python sidecar later.
-        .args(["run", "openbis-upload-helper", command])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("Failed to start Python backend: {error}"))?;
+fn run_python_command(command_name: &str, payload: &str) -> Result<Vec<u8>, String> {
+    let mut child =
+        backend::command(command_name)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|error| {
+                format!(
+                    "Failed to start Python backend: {error}"
+                )
+            })?;
 
     if let Some(mut stdin) = child.stdin.take() {
         stdin
             .write_all(payload.as_bytes())
-            .map_err(|error| format!("Failed to send data to Python backend: {error}"))?;
+            .map_err(|error| {
+                format!(
+                    "Failed to send data to Python backend: {error}"
+                )
+            })?;
     }
 
-    let output = child
-        .wait_with_output()
-        .map_err(|error| format!("Python backend failed: {error}"))?;
+    let output =
+        child
+            .wait_with_output()
+            .map_err(|error| {
+                format!(
+                    "Python backend failed: {error}"
+                )
+            })?;
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stderr =
+            String::from_utf8_lossy(
+                &output.stderr,
+            );
 
-        return Err(format!("Python backend failed: {stderr}"));
+        return Err(
+            format!(
+                "Python backend failed: {stderr}"
+            ),
+        );
     }
 
     Ok(output.stdout)
-}
-
-
-fn create_processing_backend_command() -> Command {
-    let repository_root =
-        std::path::Path::new(
-            env!("CARGO_MANIFEST_DIR"),
-        )
-        .parent()
-        .expect(
-            "src-tauri should have a parent directory",
-        );
-
-
-    #[cfg(target_os = "windows")]
-    let executable =
-        repository_root
-            .join(".venv")
-            .join("Scripts")
-            .join("openbis-upload-helper.exe");
-
-
-    #[cfg(not(target_os = "windows"))]
-    let executable =
-        repository_root
-            .join(".venv")
-            .join("bin")
-            .join("openbis-upload-helper");
-
-
-    let mut command =
-        Command::new(executable);
-
-    command.arg("process");
-
-    command
 }
 
 
@@ -276,7 +260,7 @@ fn run_processing_command(
     payload: &str,
 ) -> Result<ProcessResult, String> {
     let mut child =
-        create_processing_backend_command();
+        backend::command("process");
 
     let mut child = child
         .env("PYTHONUNBUFFERED", "1")
