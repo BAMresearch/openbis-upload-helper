@@ -1,5 +1,6 @@
 from urllib.parse import urlparse
 
+import requests
 from pybis import Openbis
 from pydantic import BaseModel, Field
 
@@ -83,6 +84,16 @@ def _exception_text(
 def _is_connection_error(
     exc: Exception,
 ) -> bool:
+    if isinstance(
+        exc,
+        (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+            requests.exceptions.SSLError,
+        ),
+    ):
+        return True
+
     text = _exception_text(exc)
 
     indicators = (
@@ -97,6 +108,8 @@ def _is_connection_error(
         "timeout",
         "ssl",
         "certificate",
+        "newconnectionerror",
+        "connection aborted",
     )
 
     return any(indicator in text for indicator in indicators)
@@ -231,15 +244,14 @@ def login(
         )
 
     except Exception as exc:
-        error = openbis_error_message(
-            exc,
-            fallback=("Invalid username/password or personal access token."),
-        )
+        if request.personal_access_token:
+            fallback = "The personal access token is invalid or has expired."
+        else:
+            fallback = "Invalid username or password."
 
-        return LoginResult(
-            success=False,
-            error=error,
-        )
+        error = openbis_error_message(exc, fallback=fallback)
+
+        return LoginResult(success=False, error=error)
 
 
 def get_spaces(

@@ -44,16 +44,20 @@ def validate_file_path(
     path = Path(raw_path)
 
     if not path.is_absolute():
-        raise ValueError(f"Source path must be absolute: {raw_path}")
+        raise ValueError("A selected source path is invalid.")
 
     if not path.exists():
-        raise ValueError(f"Source file no longer exists: {raw_path}")
+        raise ValueError(
+            "Source file no longer exists: "
+            f"{path.name}. "
+            "Refresh the source files and try again."
+        )
 
     if path.is_symlink():
-        raise ValueError(f"Symbolic links are not supported: {raw_path}")
+        raise ValueError(f"Symbolic links are not supported: {path.name}.")
 
     if not path.is_file():
-        raise ValueError(f"Source path is not a file: {raw_path}")
+        raise ValueError(f"Selected source is not a file: {path.name}.")
 
     return str(path)
 
@@ -97,7 +101,8 @@ def build_files_parser(
 
             if path in seen_paths:
                 raise ValueError(
-                    f"The same source file was assigned to multiple parser jobs: {path}"
+                    "The same source file was assigned to "
+                    f"multiple parser jobs: {Path(path).name}."
                 )
 
             seen_paths.add(path)
