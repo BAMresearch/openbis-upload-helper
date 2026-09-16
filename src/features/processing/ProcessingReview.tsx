@@ -4,10 +4,6 @@ import {
   useState,
 } from "react";
 
-import {
-  save as showSaveDialog,
-} from "@tauri-apps/plugin-dialog";
-
 import type {
   ProcessingPlan,
 } from "../parser/processingPlan";
@@ -120,22 +116,6 @@ async function exportLogs(
   const defaultFileName =
     `openbis-processing-logs-${timestamp}.json`;
 
-  const path =
-    await showSaveDialog({
-      defaultPath: defaultFileName,
-
-      filters: [
-        {
-          name: "JSON",
-          extensions: ["json"],
-        },
-      ],
-    });
-
-  if (!path) {
-    return;
-  }
-
   const data = {
     exportedAt:
       new Date().toISOString(),
@@ -151,7 +131,7 @@ async function exportLogs(
   };
 
   await saveProcessingLogs(
-    path,
+    defaultFileName,
     JSON.stringify(
       data,
       null,

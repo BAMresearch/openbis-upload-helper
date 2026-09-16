@@ -9,6 +9,26 @@
 mod backend;
 mod source;
 
+fn redact_secrets(
+    text: &str,
+    secrets: &[&str],
+) -> String {
+    let mut redacted =
+        text.to_string();
+
+    for secret in secrets {
+        if !secret.is_empty() {
+            redacted =
+                redacted.replace(
+                    secret,
+                    "[REDACTED]",
+                );
+        }
+    }
+
+    redacted
+}
+
 use serde::{Deserialize, Serialize};
 #[cfg(debug_assertions)]
 use std::io::{
@@ -222,6 +242,7 @@ fn run_processing_command(
     app: &tauri::AppHandle,
     processing_state: &Arc<Mutex<ProcessingState>>,
     payload: &str,
+    auth_token: &str,
 ) -> Result<ProcessResult, String> {
     let repository_root =
         std::path::Path::new(
@@ -339,6 +360,9 @@ fn run_processing_command(
     let stderr_processing_state =
         processing_state.clone();
 
+    let stderr_auth_token =
+        auth_token.to_string();
+
     let stderr_thread =
         std::thread::spawn(
             move || -> String {
@@ -395,7 +419,10 @@ fn run_processing_command(
                                 "error".to_string(),
 
                             message:
-                                line,
+                                redact_secrets(
+                                    &line,
+                                    &[&stderr_auth_token],
+                                ),
 
                             timestamp:
                                 None,
@@ -462,8 +489,11 @@ fn run_processing_command(
                                 "error".to_string(),
 
                             message:
-                                format!(
-                                    "Invalid processing event ({error}): {line}"
+                                redact_secrets(
+                                    &format!(
+                                        "Invalid processing event ({error}): {line}"
+                                    ),
+                                    &[auth_token],
                                 ),
 
                             timestamp:
@@ -518,11 +548,14 @@ fn run_processing_command(
                         ),
 
                 message:
-                    python_event
-                        .event
-                        .unwrap_or_else(
-                            || line.clone(),
-                        ),
+                    redact_secrets(
+                        &python_event
+                            .event
+                            .unwrap_or_else(
+                                || line.clone(),
+                            ),
+                        &[auth_token],
+                    ),
 
                 timestamp:
                     python_event.timestamp,
@@ -633,9 +666,12 @@ fn run_processing_command(
 
 
         return Err(
-            format!(
-                "Python processing backend failed: {}",
-                stderr_output.trim(),
+            redact_secrets(
+                &format!(
+                    "Python processing backend failed: {}",
+                    stderr_output.trim(),
+                ),
+                &[auth_token],
             ),
         );
     }
@@ -663,7 +699,16 @@ fn run_processing_command(
                 python_result.jobs,
 
             error:
-                python_result.error,
+                python_result
+                    .error
+                    .map(
+                        |error| {
+                            redact_secrets(
+                                &error,
+                                &[auth_token],
+                            )
+                        },
+                    ),
         },
     )
 }
@@ -674,6 +719,7 @@ fn run_processing_command(
     app: &tauri::AppHandle,
     processing_state: &Arc<Mutex<ProcessingState>>,
     payload: &str,
+    auth_token: &str,
 ) -> Result<ProcessResult, String> {
     let command =
         app
@@ -789,8 +835,11 @@ fn run_processing_command(
                                                 "error".to_string(),
 
                                             message:
-                                                format!(
-                                                    "Invalid processing event ({error}): {line}"
+                                                redact_secrets(
+                                                    &format!(
+                                                        "Invalid processing event ({error}): {line}"
+                                                    ),
+                                                    &[auth_token],
                                                 ),
 
                                             timestamp:
@@ -851,13 +900,16 @@ fn run_processing_command(
                                         ),
 
                                 message:
-                                    python_event
-                                        .event
-                                        .unwrap_or_else(
-                                            || {
-                                                line.clone()
-                                            },
-                                        ),
+                                    redact_secrets(
+                                        &python_event
+                                            .event
+                                            .unwrap_or_else(
+                                                || {
+                                                    line.clone()
+                                                },
+                                            ),
+                                        &[auth_token],
+                                    ),
 
                                 timestamp:
                                     python_event
@@ -925,7 +977,10 @@ fn run_processing_command(
                                     "error".to_string(),
 
                                 message:
-                                    line,
+                                    redact_secrets(
+                                        &line,
+                                        &[auth_token],
+                                    ),
 
                                 timestamp:
                                     None,
@@ -1027,9 +1082,12 @@ fn run_processing_command(
         }
 
         return Err(
-            format!(
-                "Python processing sidecar failed: {}",
-                stderr_output.trim(),
+            redact_secrets(
+                &format!(
+                    "Python processing sidecar failed: {}",
+                    stderr_output.trim(),
+                ),
+                &[auth_token],
             ),
         );
     }
@@ -1055,7 +1113,16 @@ fn run_processing_command(
                 python_result.jobs,
 
             error:
-                python_result.error,
+                python_result
+                    .error
+                    .map(
+                        |error| {
+                            redact_secrets(
+                                &error,
+                                &[auth_token],
+                            )
+                        },
+                    ),
         },
     )
 }
@@ -1071,6 +1138,12 @@ async fn login(
     password: String,
     personal_access_token: String,
 ) -> Result<LoginResult, String> {
+    let password_for_redaction =
+        password.clone();
+
+    let pat_for_redaction =
+        personal_access_token.clone();
+
     let request = PythonLoginRequest {
         server_url: server_url.clone(),
         username,
@@ -1111,7 +1184,16 @@ async fn login(
             format!(
                 "Login worker failed: {error}"
             )
-        })??;
+        })?
+        .map_err(|error| {
+            redact_secrets(
+                &error,
+                &[
+                    &password_for_redaction,
+                    &pat_for_redaction,
+                ],
+            )
+        })?;
 
 
     let python_result =
@@ -1283,19 +1365,52 @@ fn get_parsers(
 }
 
 #[tauri::command]
-fn save_processing_logs(
-    path: String,
+async fn save_processing_logs(
+    app: tauri::AppHandle,
+    file_name: String,
     content: String,
-) -> Result<(), String> {
+) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let file_path =
+        app
+            .dialog()
+            .file()
+            .set_file_name(
+                &file_name,
+            )
+            .add_filter(
+                "JSON",
+                &["json"],
+            )
+            .blocking_save_file();
+
+    let Some(file_path) =
+        file_path
+    else {
+        return Ok(false);
+    };
+
+    let path =
+        file_path
+            .into_path()
+            .map_err(|error| {
+                format!(
+                    "Could not resolve selected log file path: {error}"
+                )
+            })?;
+
     std::fs::write(
         &path,
         content,
     )
     .map_err(|error| {
         format!(
-            "Failed to save processing logs to '{path}': {error}"
+            "Failed to save processing logs: {error}"
         )
-    })
+    })?;
+
+    Ok(true)
 }
 
 #[tauri::command]
@@ -1444,6 +1559,9 @@ async fn process_sources(
             .collect();
 
 
+    let auth_token =
+        auth.token.clone();
+
     let request =
         PythonProcessRequest {
             server_url:
@@ -1489,6 +1607,7 @@ async fn process_sources(
                     &worker_app,
                     &worker_state,
                     &payload,
+                    &auth_token,
                 )
             },
         )
