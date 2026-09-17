@@ -1,6 +1,6 @@
 [project]
 name = "openbis-upload-helper"
-version = "1.0.0"
+version = "1.0.1"
 description = "Desktop helper for parsing and uploading scientific data to openBIS."
 readme = "README.md"
 requires-python = ">=3.14"
