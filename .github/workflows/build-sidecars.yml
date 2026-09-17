@@ -1,0 +1,44 @@
+name: Build Python sidecars
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-sidecar:
+    name: Build sidecar - ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.14
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Build Python sidecar
+        run: uv run python scripts/build_sidecar.py
+
+      - name: Upload sidecar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sidecar-${{ runner.os }}-${{ runner.arch }}
+          path: src-tauri/binaries/openbis-helper-python-*
+          if-no-files-found: error
+          retention-days: 14

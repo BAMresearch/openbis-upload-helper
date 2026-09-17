@@ -6,9 +6,8 @@
     "main"
   ],
   "permissions": [
-    "core:default",
-    "opener:default",
-    "dialog:default",
-    "core:webview:allow-set-webview-zoom"
+    "core:event:default",
+    "core:webview:allow-set-webview-zoom",
+    "dialog:allow-open"
   ]
 }

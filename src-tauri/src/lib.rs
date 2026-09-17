@@ -6,19 +6,52 @@
 // For production:
 //   Python will be bundled as a sidecar and invoked instead.
 
+mod backend;
 mod source;
 
+fn redact_secrets(
+    text: &str,
+    secrets: &[&str],
+) -> String {
+    let mut redacted =
+        text.to_string();
+
+    for secret in secrets {
+        if !secret.is_empty() {
+            redacted =
+                redacted.replace(
+                    secret,
+                    "[REDACTED]",
+                );
+        }
+    }
+
+    redacted
+}
+
 use serde::{Deserialize, Serialize};
+#[cfg(debug_assertions)]
 use std::io::{
     BufRead,
     BufReader,
     Write,
 };
-use tauri::Emitter;
-use std::process::{Command, Stdio};
+use tauri::{
+    Emitter,
+    Manager,
+};
+#[cfg(debug_assertions)]
+use std::process::Stdio;
 use std::sync::{
     Arc,
     Mutex,
+};
+
+
+#[cfg(not(debug_assertions))]
+use tauri_plugin_shell::{
+    process::CommandEvent,
+    ShellExt,
 };
 
 #[derive(Debug, Serialize)]
@@ -54,7 +87,7 @@ struct AuthState {
 struct ProcessingState {
     running: bool,
     cancel_requested: bool,
-    child: Option<std::process::Child>,
+    child: Option<backend::ProcessingChild>,
 }
 
 struct AppState {
@@ -204,36 +237,13 @@ struct ProcessingEvent {
 }
 
 
-fn run_python_command(command: &str, payload: &str) -> Result<Vec<u8>, String> {
-    let mut child = Command::new("uv") // Development only; Replace this with the bundled Python sidecar later.
-        .args(["run", "openbis-upload-helper", command])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("Failed to start Python backend: {error}"))?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(payload.as_bytes())
-            .map_err(|error| format!("Failed to send data to Python backend: {error}"))?;
-    }
-
-    let output = child
-        .wait_with_output()
-        .map_err(|error| format!("Python backend failed: {error}"))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-
-        return Err(format!("Python backend failed: {stderr}"));
-    }
-
-    Ok(output.stdout)
-}
-
-
-fn create_processing_backend_command() -> Command {
+#[cfg(debug_assertions)]
+fn run_processing_command(
+    app: &tauri::AppHandle,
+    processing_state: &Arc<Mutex<ProcessingState>>,
+    payload: &str,
+    auth_token: &str,
+) -> Result<ProcessResult, String> {
     let repository_root =
         std::path::Path::new(
             env!("CARGO_MANIFEST_DIR"),
@@ -243,14 +253,12 @@ fn create_processing_backend_command() -> Command {
             "src-tauri should have a parent directory",
         );
 
-
     #[cfg(target_os = "windows")]
     let executable =
         repository_root
             .join(".venv")
             .join("Scripts")
             .join("openbis-upload-helper.exe");
-
 
     #[cfg(not(target_os = "windows"))]
     let executable =
@@ -259,23 +267,12 @@ fn create_processing_backend_command() -> Command {
             .join("bin")
             .join("openbis-upload-helper");
 
-
-    let mut command =
-        Command::new(executable);
-
-    command.arg("process");
-
-    command
-}
-
-
-fn run_processing_command(
-    app: &tauri::AppHandle,
-    processing_state: &Arc<Mutex<ProcessingState>>,
-    payload: &str,
-) -> Result<ProcessResult, String> {
     let mut child =
-        create_processing_backend_command();
+        std::process::Command::new(
+            executable,
+        );
+
+    child.arg("process");
 
     let mut child = child
         .env("PYTHONUNBUFFERED", "1")
@@ -322,29 +319,33 @@ fn run_processing_command(
 
 
     /*
-     * Store the actual Python process in AppState.
-     * cancel_processing() can now terminate it.
-     */
+    * Store the actual Python process in AppState.
+    * cancel_processing() can now terminate it.
+    */
     {
-        let mut processing = processing_state
-            .lock()
-            .map_err(|_| {
-                "Failed to access processing state."
-            })?;
+        let mut processing =
+            processing_state
+                .lock()
+                .map_err(|_| {
+                    "Failed to access processing state."
+                })?;
 
-        processing.child = Some(child);
-
+        processing.child =
+            Some(child);
 
         /*
-         * Cancellation may have been requested during
-         * the short interval between starting the
-         * operation and storing the child.
-         */
+        * Cancellation or application shutdown may
+        * have been requested while the child was
+        * being started.
+        */
         if processing.cancel_requested {
             if let Some(child) =
-                processing.child.as_mut()
+                processing.child.take()
             {
-                let _ = child.kill();
+                let _ =
+                    backend::kill_processing_child(
+                        child,
+                    );
             }
         }
     }
@@ -355,6 +356,12 @@ fn run_processing_command(
      * cannot block the Python process.
      */
     let stderr_app = app.clone();
+
+    let stderr_processing_state =
+        processing_state.clone();
+
+    let stderr_auth_token =
+        auth_token.to_string();
 
     let stderr_thread =
         std::thread::spawn(
@@ -389,6 +396,19 @@ fn run_processing_command(
 
                     collected.push('\n');
 
+                    let cancelled =
+                        stderr_processing_state
+                            .lock()
+                            .map(
+                                |processing| {
+                                    processing.cancel_requested
+                                },
+                            )
+                            .unwrap_or(false);
+
+                    if cancelled {
+                        continue;
+                    }
 
                     let event =
                         ProcessingEvent {
@@ -399,7 +419,10 @@ fn run_processing_command(
                                 "error".to_string(),
 
                             message:
-                                line,
+                                redact_secrets(
+                                    &line,
+                                    &[&stderr_auth_token],
+                                ),
 
                             timestamp:
                                 None,
@@ -466,8 +489,11 @@ fn run_processing_command(
                                 "error".to_string(),
 
                             message:
-                                format!(
-                                    "Invalid processing event ({error}): {line}"
+                                redact_secrets(
+                                    &format!(
+                                        "Invalid processing event ({error}): {line}"
+                                    ),
+                                    &[auth_token],
                                 ),
 
                             timestamp:
@@ -522,11 +548,14 @@ fn run_processing_command(
                         ),
 
                 message:
-                    python_event
-                        .event
-                        .unwrap_or_else(
-                            || line.clone(),
-                        ),
+                    redact_secrets(
+                        &python_event
+                            .event
+                            .unwrap_or_else(
+                                || line.clone(),
+                            ),
+                        &[auth_token],
+                    ),
 
                 timestamp:
                     python_event.timestamp,
@@ -554,62 +583,41 @@ fn run_processing_command(
     }
 
 
-    /*
-     * stdout closes when Python exits, including
-     * when it was killed by cancel_processing().
-     */
-    let mut child = {
-        let mut processing = processing_state
-            .lock()
-            .map_err(|_| {
-                "Failed to access processing state."
-            })?;
+    let child = {
+        let mut processing =
+            processing_state
+                .lock()
+                .map_err(|_| {
+                    "Failed to access processing state."
+                })?;
 
-        processing
-            .child
-            .take()
-            .ok_or(
-                "Processing child process was unexpectedly missing.",
-            )?
+        processing.child.take()
     };
 
-
-    let status =
-        child.wait().map_err(
-            |error| {
-                format!(
-                    "Python processing backend failed: {error}"
-                )
-            },
-        )?;
-
-
-    let stderr_output =
-        stderr_thread
-            .join()
-            .unwrap_or_else(
-                |_| {
-                    "Failed to read Python stderr."
-                        .to_string()
-                },
-            );
-
-
     let cancelled = {
-        let processing = processing_state
-            .lock()
-            .map_err(|_| {
-                "Failed to access processing state."
-            })?;
+        let processing =
+            processing_state
+                .lock()
+                .map_err(|_| {
+                    "Failed to access processing state."
+                })?;
 
         processing.cancel_requested
     };
 
-
-    /*
-     * Cancellation is a separate outcome from failure.
-     */
     if cancelled {
+        /*
+        * cancel_processing() may already have taken,
+        * killed and reaped the child.
+        */
+        if let Some(mut child) = child {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+
+        let _ =
+            stderr_thread.join();
+
         return Ok(
             ProcessResult {
                 success: false,
@@ -620,6 +628,30 @@ fn run_processing_command(
             },
         );
     }
+
+    let mut child =
+        child.ok_or(
+            "Processing child process was unexpectedly missing.",
+        )?;
+
+    let status =
+        child
+            .wait()
+            .map_err(|error| {
+                format!(
+                    "Python processing backend failed: {error}"
+                )
+            })?;
+
+    let stderr_output =
+        stderr_thread
+            .join()
+            .unwrap_or_else(
+                |_| {
+                    "Failed to read Python stderr."
+                        .to_string()
+                },
+            );
 
 
     if !status.success() {
@@ -634,9 +666,12 @@ fn run_processing_command(
 
 
         return Err(
-            format!(
-                "Python processing backend failed: {}",
-                stderr_output.trim(),
+            redact_secrets(
+                &format!(
+                    "Python processing backend failed: {}",
+                    stderr_output.trim(),
+                ),
+                &[auth_token],
             ),
         );
     }
@@ -664,20 +699,451 @@ fn run_processing_command(
                 python_result.jobs,
 
             error:
-                python_result.error,
+                python_result
+                    .error
+                    .map(
+                        |error| {
+                            redact_secrets(
+                                &error,
+                                &[auth_token],
+                            )
+                        },
+                    ),
         },
     )
 }
 
 
+#[cfg(not(debug_assertions))]
+fn run_processing_command(
+    app: &tauri::AppHandle,
+    processing_state: &Arc<Mutex<ProcessingState>>,
+    payload: &str,
+    auth_token: &str,
+) -> Result<ProcessResult, String> {
+    let command =
+        app
+            .shell()
+            .sidecar(
+                "openbis-helper-python",
+            )
+            .map_err(|error| {
+                format!(
+                    "Could not resolve Python sidecar: {error}"
+                )
+            })?
+            .arg("process")
+            .env(
+                "PYTHONUNBUFFERED",
+                "1",
+            );
+
+    let (mut receiver, mut child) =
+        command
+            .spawn()
+            .map_err(|error| {
+                format!(
+                    "Failed to start Python processing sidecar: {error}"
+                )
+            })?;
+
+    let mut request =
+        payload.as_bytes().to_vec();
+
+    request.push(b'\n');
+
+    child
+        .write(&request)
+        .map_err(|error| {
+            format!(
+                "Failed to send processing request to Python sidecar: {error}"
+            )
+        })?;
+
+    {
+        let mut processing =
+            processing_state
+                .lock()
+                .map_err(|_| {
+                    "Failed to access processing state."
+                        .to_string()
+                })?;
+
+        processing.child =
+            Some(child);
+
+        if processing.cancel_requested {
+            if let Some(child) =
+                processing.child.take()
+            {
+                let _ =
+                    backend::kill_processing_child(
+                        child,
+                    );
+            }
+        }
+    }
+
+    let mut final_result:
+        Option<PythonProcessResult> =
+        None;
+
+    let mut stderr_output =
+        String::new();
+
+    let mut exit_code:
+        Option<i32> =
+        None;
+
+    tauri::async_runtime::block_on(
+        async {
+            while let Some(event) =
+                receiver.recv().await
+            {
+                match event {
+                    CommandEvent::Stdout(
+                        bytes,
+                    ) => {
+                        let line =
+                            String::from_utf8_lossy(
+                                &bytes,
+                            )
+                            .to_string();
+
+                        if line
+                            .trim()
+                            .is_empty()
+                        {
+                            continue;
+                        }
+
+                        let python_event =
+                            match serde_json::from_str::<
+                                PythonProcessingEvent,
+                            >(&line)
+                            {
+                                Ok(event) =>
+                                    event,
+
+                                Err(error) => {
+                                    let event =
+                                        ProcessingEvent {
+                                            kind:
+                                                "log".to_string(),
+
+                                            level:
+                                                "error".to_string(),
+
+                                            message:
+                                                redact_secrets(
+                                                    &format!(
+                                                        "Invalid processing event ({error}): {line}"
+                                                    ),
+                                                    &[auth_token],
+                                                ),
+
+                                            timestamp:
+                                                None,
+
+                                            stage:
+                                                None,
+
+                                            files:
+                                                None,
+
+                                            jobs:
+                                                None,
+                                        };
+
+                                    let _ =
+                                        app.emit(
+                                            "processing-event",
+                                            event,
+                                        );
+
+                                    continue;
+                                }
+                            };
+
+                        if python_event
+                            .kind
+                            .as_deref()
+                            == Some(
+                                "result",
+                            )
+                        {
+                            final_result =
+                                python_event
+                                    .result;
+
+                            continue;
+                        }
+
+                        let event =
+                            ProcessingEvent {
+                                kind:
+                                    python_event
+                                        .kind
+                                        .unwrap_or_else(
+                                            || {
+                                                "log".to_string()
+                                            },
+                                        ),
+
+                                level:
+                                    python_event
+                                        .level
+                                        .unwrap_or_else(
+                                            || {
+                                                "info".to_string()
+                                            },
+                                        ),
+
+                                message:
+                                    redact_secrets(
+                                        &python_event
+                                            .event
+                                            .unwrap_or_else(
+                                                || {
+                                                    line.clone()
+                                                },
+                                            ),
+                                        &[auth_token],
+                                    ),
+
+                                timestamp:
+                                    python_event
+                                        .timestamp,
+
+                                stage:
+                                    python_event
+                                        .stage,
+
+                                files:
+                                    python_event
+                                        .files,
+
+                                jobs:
+                                    python_event
+                                        .jobs,
+                            };
+
+                        let _ =
+                            app.emit(
+                                "processing-event",
+                                event,
+                            );
+                    }
+
+                    CommandEvent::Stderr(
+                        bytes,
+                    ) => {
+                        let line =
+                            String::from_utf8_lossy(
+                                &bytes,
+                            )
+                            .to_string();
+
+                        stderr_output
+                            .push_str(
+                                &line,
+                            );
+
+                        stderr_output
+                            .push('\n');
+
+
+                        let cancelled =
+                            processing_state
+                                .lock()
+                                .map(
+                                    |processing| {
+                                        processing.cancel_requested
+                                    },
+                                )
+                                .unwrap_or(false);
+
+                        if cancelled {
+                            continue;
+                        }
+
+
+                        let event =
+                            ProcessingEvent {
+                                kind:
+                                    "log".to_string(),
+
+                                level:
+                                    "error".to_string(),
+
+                                message:
+                                    redact_secrets(
+                                        &line,
+                                        &[auth_token],
+                                    ),
+
+                                timestamp:
+                                    None,
+
+                                stage:
+                                    None,
+
+                                files:
+                                    None,
+
+                                jobs:
+                                    None,
+                            };
+
+                        let _ =
+                            app.emit(
+                                "processing-event",
+                                event,
+                            );
+                    }
+
+                    CommandEvent::Error(
+                        error,
+                    ) => {
+                        stderr_output
+                            .push_str(
+                                &error,
+                            );
+
+                        stderr_output
+                            .push('\n');
+                    }
+
+                    CommandEvent::Terminated(
+                        terminated,
+                    ) => {
+                        exit_code =
+                            terminated.code;
+
+                        break;
+                    }
+
+                    _ => {}
+                }
+            }
+        },
+    );
+
+    let cancelled = {
+        let processing =
+            processing_state
+                .lock()
+                .map_err(|_| {
+                    "Failed to access processing state."
+                })?;
+
+        processing
+            .cancel_requested
+    };
+
+    {
+        let mut processing =
+            processing_state
+                .lock()
+                .map_err(|_| {
+                    "Failed to access processing state."
+                })?;
+
+        /*
+         * The process has already terminated.
+         * Remove any remaining handle.
+         */
+        processing.child.take();
+    }
+
+    if cancelled {
+        return Ok(
+            ProcessResult {
+                success: false,
+                cancelled: true,
+                processed_files: 0,
+                jobs: 0,
+                error: None,
+            },
+        );
+    }
+
+    if exit_code != Some(0) {
+        if stderr_output
+            .trim()
+            .is_empty()
+        {
+            return Err(
+                format!(
+                    "Python processing sidecar exited with code {:?}.",
+                    exit_code,
+                ),
+            );
+        }
+
+        return Err(
+            redact_secrets(
+                &format!(
+                    "Python processing sidecar failed: {}",
+                    stderr_output.trim(),
+                ),
+                &[auth_token],
+            ),
+        );
+    }
+
+    let python_result =
+        final_result.ok_or(
+            "Python processing sidecar finished without returning a final result.",
+        )?;
+
+    Ok(
+        ProcessResult {
+            success:
+                python_result.success,
+
+            cancelled:
+                false,
+
+            processed_files:
+                python_result
+                    .processed_files,
+
+            jobs:
+                python_result.jobs,
+
+            error:
+                python_result
+                    .error
+                    .map(
+                        |error| {
+                            redact_secrets(
+                                &error,
+                                &[auth_token],
+                            )
+                        },
+                    ),
+        },
+    )
+}
+
+
+
 #[tauri::command]
 async fn login(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     server_url: String,
     username: String,
     password: String,
     personal_access_token: String,
 ) -> Result<LoginResult, String> {
+    let password_for_redaction =
+        password.clone();
+
+    let pat_for_redaction =
+        personal_access_token.clone();
+
     let request = PythonLoginRequest {
         server_url: server_url.clone(),
         username,
@@ -700,10 +1166,14 @@ async fn login(
      * performs network requests. Run the blocking
      * Python process away from the Tauri UI thread.
      */
+    let backend_app =
+        app.clone();
+
     let output =
         tauri::async_runtime::spawn_blocking(
             move || {
-                run_python_command(
+                backend::run(
+                    &backend_app,
                     "login",
                     &payload,
                 )
@@ -714,7 +1184,16 @@ async fn login(
             format!(
                 "Login worker failed: {error}"
             )
-        })??;
+        })?
+        .map_err(|error| {
+            redact_secrets(
+                &error,
+                &[
+                    &password_for_redaction,
+                    &pat_for_redaction,
+                ],
+            )
+        })?;
 
 
     let python_result =
@@ -771,7 +1250,10 @@ async fn login(
 }
 
 #[tauri::command]
-fn get_spaces(state: tauri::State<AppState>) -> Result<SpacesResult, String> {
+fn get_spaces(
+    app: tauri::AppHandle,
+    state: tauri::State<AppState>,
+) -> Result<SpacesResult, String> {
     let auth = {
         let stored_auth = state
             .auth
@@ -783,14 +1265,22 @@ fn get_spaces(state: tauri::State<AppState>) -> Result<SpacesResult, String> {
 
     let payload = serde_json::to_string(&auth).map_err(|error| error.to_string())?;
 
-    let output = run_python_command("spaces", &payload)?;
+    let output =
+        backend::run(
+            &app,
+            "spaces",
+            &payload,
+        )?;
 
     serde_json::from_slice::<SpacesResult>(&output)
         .map_err(|error| format!("Invalid response from Python backend: {error}"))
 }
 
 #[tauri::command]
-fn get_projects(state: tauri::State<AppState>, space: String) -> Result<ProjectsResult, String> {
+fn get_projects(
+    app: tauri::AppHandle,
+    state: tauri::State<AppState>, space: String,
+) -> Result<ProjectsResult, String> {
     let auth = {
         let stored_auth = state
             .auth
@@ -808,7 +1298,12 @@ fn get_projects(state: tauri::State<AppState>, space: String) -> Result<Projects
 
     let payload = serde_json::to_string(&request).map_err(|error| error.to_string())?;
 
-    let output = run_python_command("projects", &payload)?;
+    let output =
+        backend::run(
+            &app,
+            "projects",
+            &payload,
+        )?;
 
     serde_json::from_slice::<ProjectsResult>(&output)
         .map_err(|error| format!("Invalid response from Python backend: {error}"))
@@ -816,6 +1311,7 @@ fn get_projects(state: tauri::State<AppState>, space: String) -> Result<Projects
 
 #[tauri::command]
 fn get_collections(
+    app: tauri::AppHandle,
     state: tauri::State<AppState>,
     space: String,
     project: String,
@@ -838,16 +1334,24 @@ fn get_collections(
 
     let payload = serde_json::to_string(&request).map_err(|error| error.to_string())?;
 
-    let output = run_python_command("collections", &payload)?;
+    let output =
+        backend::run(
+            &app,
+            "collections",
+            &payload,
+        )?;
 
     serde_json::from_slice::<CollectionsResult>(&output)
         .map_err(|error| format!("Invalid response from Python backend: {error}"))
 }
 
 #[tauri::command]
-fn get_parsers() -> Result<ParsersResult, String> {
+fn get_parsers(
+    app: tauri::AppHandle,
+) -> Result<ParsersResult, String> {
     let output =
-        run_python_command(
+        backend::run(
+            &app,
             "parsers",
             "",
         )?;
@@ -862,18 +1366,71 @@ fn get_parsers() -> Result<ParsersResult, String> {
 
 #[tauri::command]
 fn save_processing_logs(
-    path: String,
+    app: tauri::AppHandle,
+    file_name: String,
     content: String,
 ) -> Result<(), String> {
-    std::fs::write(
-        &path,
-        content,
-    )
-    .map_err(|error| {
-        format!(
-            "Failed to save processing logs to '{path}': {error}"
+    use tauri_plugin_dialog::DialogExt;
+
+    let export_app =
+        app.clone();
+
+    app
+        .dialog()
+        .file()
+        .set_file_name(
+            &file_name,
         )
-    })
+        .add_filter(
+            "JSON",
+            &["json"],
+        )
+        .save_file(
+            move |file_path| {
+                let Some(file_path) =
+                    file_path
+                else {
+                    return;
+                };
+
+                let path =
+                    match file_path
+                        .into_path()
+                    {
+                        Ok(path) =>
+                            path,
+
+                        Err(error) => {
+                            let _ =
+                                export_app.emit(
+                                    "processing-log-export-error",
+                                    format!(
+                                        "Could not resolve the selected log file path: {error}"
+                                    ),
+                                );
+
+                            return;
+                        }
+                    };
+
+                if let Err(error) =
+                    std::fs::write(
+                        &path,
+                        content,
+                    )
+                {
+                    let _ =
+                        export_app.emit(
+                            "processing-log-export-error",
+                            format!(
+                                "Could not save the processing logs: {error}"
+                            ),
+                        );
+                }
+            },
+        );
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -889,28 +1446,24 @@ fn cancel_processing(
                 "Failed to access processing state."
             })?;
 
-
         if !processing.running {
-            return Err(
-                "No processing operation is running."
-                    .to_string(),
-            );
+            return Ok(());
         }
-
 
         processing.cancel_requested = true;
 
 
         if let Some(child) =
-            processing.child.as_mut()
+            processing.child.take()
         {
-            child
-                .kill()
-                .map_err(|error| {
-                    format!(
-                        "Failed to cancel processing: {error}"
-                    )
-                })?;
+            backend::kill_processing_child(
+                child,
+            )
+            .map_err(|error| {
+                format!(
+                    "Failed to cancel processing: {error}"
+                )
+            })?;
         }
     }
 
@@ -1026,6 +1579,9 @@ async fn process_sources(
             .collect();
 
 
+    let auth_token =
+        auth.token.clone();
+
     let request =
         PythonProcessRequest {
             server_url:
@@ -1071,6 +1627,7 @@ async fn process_sources(
                     &worker_app,
                     &worker_state,
                     &payload,
+                    &auth_token,
                 )
             },
         )
@@ -1093,15 +1650,22 @@ async fn process_sources(
                     "Failed to access processing state."
                 })?;
 
-
-        if let Some(
-            mut child,
-        ) = processing.child.take()
+        if let Some(child) =
+            processing.child.take()
         {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
+            #[cfg(debug_assertions)]
+            {
+                let mut child = child;
 
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+
+            #[cfg(not(debug_assertions))]
+            {
+                let _ = child.kill();
+            }
+        }
 
         processing.running = false;
         processing.cancel_requested = false;
@@ -1111,35 +1675,151 @@ async fn process_sources(
     result
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    tauri::Builder::default()
-        .manage(AppState {
-            auth: Mutex::new(None),
+fn cleanup_processing_on_exit(
+    app: &tauri::AppHandle,
+) {
+    let state =
+        app.state::<AppState>();
 
-            processing: Arc::new(
-                Mutex::new(
-                    ProcessingState {
-                        running: false,
-                        cancel_requested: false,
-                        child: None,
-                    },
-                ),
+    /*
+     * First mark the operation as intentionally
+     * cancelled. A processing worker that has not
+     * registered its child yet will see this flag
+     * as soon as it does so.
+     */
+    {
+        let mut processing =
+            match state.processing.lock() {
+                Ok(processing) =>
+                    processing,
+
+                Err(_) =>
+                    return,
+            };
+
+        if !processing.running {
+            return;
+        }
+
+        processing.cancel_requested =
+            true;
+    }
+
+
+    /*
+     * There is a very small interval between
+     * spawning the backend and registering its
+     * child handle in ProcessingState.
+     *
+     * During shutdown, wait briefly for that
+     * registration rather than allowing the
+     * backend to become orphaned.
+     */
+    for _ in 0..40 {
+        let child = {
+            let mut processing =
+                match state.processing.lock() {
+                    Ok(processing) =>
+                        processing,
+
+                    Err(_) =>
+                        return,
+                };
+
+            if !processing.running {
+                return;
+            }
+
+            processing.child.take()
+        };
+
+
+        if let Some(child) = child {
+            let _ =
+                backend::kill_processing_child(
+                    child,
+                );
+
+            return;
+        }
+
+
+        std::thread::sleep(
+            std::time::Duration::from_millis(
+                25,
             ),
-        })
-        .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![
-            login,
-            get_spaces,
-            get_projects,
-            get_collections,
-            get_parsers,
-            process_sources,
-            cancel_processing,
-            save_processing_logs,
-            source::scan_sources,
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        );
+    }
+}
+
+#[cfg_attr(
+    mobile,
+    tauri::mobile_entry_point
+)]
+pub fn run() {
+    let app =
+        tauri::Builder::default()
+            .manage(
+                AppState {
+                    auth:
+                        Mutex::new(
+                            None,
+                        ),
+
+                    processing:
+                        Arc::new(
+                            Mutex::new(
+                                ProcessingState {
+                                    running:
+                                        false,
+
+                                    cancel_requested:
+                                        false,
+
+                                    child:
+                                        None,
+                                },
+                            ),
+                        ),
+                },
+            )
+            .plugin(
+                tauri_plugin_dialog::init(),
+            )
+            .plugin(
+                tauri_plugin_shell::init(),
+            )
+            .invoke_handler(
+                tauri::generate_handler![
+                    login,
+                    get_spaces,
+                    get_projects,
+                    get_collections,
+                    get_parsers,
+                    process_sources,
+                    cancel_processing,
+                    save_processing_logs,
+                    source::scan_sources,
+                ],
+            )
+            .build(
+                tauri::generate_context!(),
+            )
+            .expect(
+                "error while building tauri application",
+            );
+
+
+    app.run(
+        |app_handle, event| {
+            if let tauri::RunEvent::ExitRequested {
+                ..
+            } = event
+            {
+                cleanup_processing_on_exit(
+                    app_handle,
+                );
+            }
+        },
+    );
 }

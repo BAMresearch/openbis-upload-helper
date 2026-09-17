@@ -4,10 +4,6 @@ import {
   useState,
 } from "react";
 
-import {
-  save as showSaveDialog,
-} from "@tauri-apps/plugin-dialog";
-
 import type {
   ProcessingPlan,
 } from "../parser/processingPlan";
@@ -20,6 +16,7 @@ import {
 import {
   cancelProcessing,
   listenToProcessingEvents,
+  listenToLogExportErrors,
   processSources,
   saveProcessingLogs,
 } from "./processing";
@@ -120,22 +117,6 @@ async function exportLogs(
   const defaultFileName =
     `openbis-processing-logs-${timestamp}.json`;
 
-  const path =
-    await showSaveDialog({
-      defaultPath: defaultFileName,
-
-      filters: [
-        {
-          name: "JSON",
-          extensions: ["json"],
-        },
-      ],
-    });
-
-  if (!path) {
-    return;
-  }
-
   const data = {
     exportedAt:
       new Date().toISOString(),
@@ -151,7 +132,7 @@ async function exportLogs(
   };
 
   await saveProcessingLogs(
-    path,
+    defaultFileName,
     JSON.stringify(
       data,
       null,
@@ -256,6 +237,37 @@ export function ProcessingReview({
     };
   }, []);
 
+  useEffect(() => {
+    let unlisten:
+      (() => void) | undefined;
+
+    let disposed = false;
+
+    listenToLogExportErrors(
+      (message) => {
+        if (!disposed) {
+          setError(
+            message,
+          );
+        }
+      },
+    ).then(
+      (cleanup) => {
+        if (disposed) {
+          cleanup();
+          return;
+        }
+
+        unlisten =
+          cleanup;
+      },
+    );
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
 
   useEffect(() => {
     logEndRef.current
@@ -529,6 +541,14 @@ export function ProcessingReview({
                     space,
                     project,
                     collection,
+                  ).catch(
+                    (error) => {
+                      setError(
+                        error instanceof Error
+                          ? error.message
+                          : String(error),
+                      );
+                    },
                   );
                 }}
               >

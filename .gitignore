@@ -199,3 +199,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Generated Tauri sidecars
+src-tauri/binaries/*
+!src-tauri/binaries/.gitkeep
