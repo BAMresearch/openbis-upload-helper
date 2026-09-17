@@ -14,8 +14,10 @@
     "windows": [
       {
         "title": "openBIS Upload Helper",
-        "width": 800,
-        "height": 600,
+        "width": 900,
+        "height": 700,
+        "minWidth": 800,
+        "minHeight": 600,
         "zoomHotkeysEnabled": true
       }
     ],

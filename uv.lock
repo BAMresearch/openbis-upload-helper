@@ -571,6 +571,7 @@ dependencies = [
     { name = "openbis-parser-example" },
     { name = "pybis" },
     { name = "pydantic" },
+    { name = "requests" },
 ]
 
 [package.dev-dependencies]
@@ -586,6 +587,7 @@ requires-dist = [
     { name = "openbis-parser-example", specifier = ">=1.0.0" },
     { name = "pybis", specifier = ">=1.37.5" },
     { name = "pydantic", specifier = ">=2.13.5" },
+    { name = "requests", specifier = ">=2.32" },
 ]
 
 [package.metadata.requires-dev]
