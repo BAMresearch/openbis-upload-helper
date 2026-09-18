@@ -74,6 +74,20 @@ jobs:
             libappindicator3-dev \
             librsvg2-dev
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.14
+
+      - name: Install Python dependencies
+        run: uv sync --locked
+
+      - name: Build Python sidecar
+        run: uv run python scripts/build_sidecar.py
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
