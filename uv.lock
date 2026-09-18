@@ -563,7 +563,7 @@ wheels = [
 
 [[package]]
 name = "openbis-upload-helper"
-version = "1.0.1"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "bam-masterdata" },
