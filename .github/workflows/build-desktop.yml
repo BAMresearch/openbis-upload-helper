@@ -3,6 +3,13 @@ name: Build desktop packages
 on:
   workflow_dispatch:
 
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build ${{ matrix.name }}
@@ -33,6 +40,7 @@ jobs:
               src-tauri/target/release/bundle/dmg/*.dmg
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
 
     steps:
       - name: Check out repository
@@ -88,4 +96,4 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_path }}
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
