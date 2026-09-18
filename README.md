@@ -1,179 +1,94 @@
-# OpenBIS Upload Helper
+# openBIS Upload Helper
 
-The openBIS Upload Helper is a tool to parse files and extract their relevant metadata into objects and vocabularies in openBIS.
+The **openBIS Upload Helper** is a desktop application for preparing and uploading scientific data to openBIS.
 
-This tool works using the package [`bam-masterdata`](https://github.com/BAMresearch/bam-masterdata) to grep the object types definitions. Each parser is loaded via entry points from individual GitHub repositories (see e.g., [`masterdata-parser-example`](https://github.dev/BAMresearch/masterdata-parser-example)).
+It helps users:
 
+- choose files or folders to upload,
+- select the target openBIS space/project/collection,
+- run format-specific parsers,
+- extract metadata from scientific data,
+- create the corresponding objects and datasets in openBIS.
 
-## Usage
+The application is built with **Tauri**, **React/TypeScript**, **Rust**, and a bundled **Python sidecar**.
 
-If you want to use this tool for your own openBIS instance, we recommend:
-1. Fork the `bam-masterdata` repository.
-2. Fork this `openbis-upload-helper` repository.
-3. Adapt both forks to your specific openBIS instance.
-4. Create your own GitHub repositories for your parsers.
-5. Deploy the app at your convenience.
+## Installation
+
+Pre-built desktop packages are provided through GitHub Releases.
+
+Supported packages:
+
+- **Windows**: NSIS `.exe` installer
+- **Linux**: `.AppImage`
+- **macOS**: `.dmg` / `.app`
+
+Production users do not need Python, Node.js, Rust, uv, or pnpm installed.
+
+On Windows, the installer uses a per-user installation and does not require administrator credentials.
+
+## How parsers work
+
+Scientific file formats and workflows are handled through dedicated **parser plugins**.
+
+A parser knows how to interpret a specific file or folder structure and can:
+
+- extract relevant metadata,
+- map metadata to the BAM data model,
+- create the required openBIS objects,
+- upload associated files as datasets.
+
+Parsers are discovered through Python entry points and are bundled into each application release.
+
+The current production application therefore ships with a fixed parser set. Users do not install parsers separately.
+
+If support for a new format or workflow is needed, please open a GitHub issue describing:
+
+- the file format or folder structure,
+- the metadata that should be extracted,
+- the expected openBIS representation,
+- example files where possible.
+
+A new parser can then be developed and included in a future release.
+
+## Data model
+
+The application uses [`bam-masterdata`](https://github.com/BAMresearch/bam-masterdata) as the common data model for creating objects and metadata in openBIS.
+
+This keeps parser outputs aligned with the BAM-wide schema instead of defining independent object structures for each parser.
+
+## Authentication
+
+The application connects directly to openBIS.
+
+Authentication can use:
+
+- username/password,
+- personal access token (PAT).
+
+Credentials and tokens are session-only and are not stored persistently by the application.
 
 ## Development
 
-If you want to develop locally this package, clone the project and enter in the workspace folder:
+Developer setup, local development, sidecar builds, CI, packaging, versioning, and release procedures are documented in:
 
-```sh
-git clone https://github.com/BAMresearch/openbis-upload-helper.git
-cd openbis-upload-helper
-```
+[`INSTRUCTIONS.md`](INSTRUCTIONS.md)
 
-Create a virtual environment (you can use Python>3.10) in your workspace:
-
-```sh
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-Run the following commands to pip install the dependencies:
-```sh
-pip install --upgrade pip
-pip install uv
-uv pip install -e '.[dev,parsers]'
-```
-
-**Note**: The parsers are loaded as entry points via the optional dependencies in the `pyproject.toml` of this repository. More info under Parsers and Dynamic Plugins.
-
-
-### Configuration: settings.ini
-
-A sample settings file is provided at:
-`openbis_upload_helper\uploader\settings.ini.example`
-
-Copy this file to the project root and rename it to **`settings.ini`**. **Do not commit or push this file** to the repository because it contains secrets.
-
-What to set inside
-- **DEBUG**: set to `True` for local **development** so the Django development server will serve static files automatically.
-- **SECRET_KEY**: Django secret key for cryptographic signing.
-- **SECRET_ENCRYPTION_KEY**: application-specific encryption key used by this project.
-- **CSRF_TRUSTED_ORIGINS**: include your local host entries (for example `http://127.0.0.1:8000`). Use full scheme + host entries.
-- **OPENBIS_URL**: openBIS instance URL for uploading the data.
-- **SPACE_FILTER**: List of space codes to exclude from display (e.g. ["DEFAULT", "SETTINGS"])
-- **UPLOAD_SIZE_LIMIT**: Maximum total size of the uploaded files in bytes. Example: `UPLOAD_SIZE_LIMIT=10000000000` for 10 GiB. The value must be an integer (bytes).
-- **UPLOAD_TIMEOUT_SECONDS**: Maximum time allowed for the file upload and extraction phase (in seconds). If the loader spends longer than this value while receiving/writing/extracting files, the upload will be aborted. Example: `UPLOAD_TIMEOUT_SECONDS=3000`.
-
-
-Static files note
-- With **DEBUG=True**, the development server serves static files automatically.
-- With **DEBUG=False** you must collect static files and serve them with a proper web server.
-
-Database and admin steps
-- Run migrations before starting the server:
-`python openbis_upload_helper\manage.py migrate`
-
-- If you need the Django admin site, create a superuser after migrating:
-`python openbis_upload_helper\manage.py createsuperuser`
-
-Order recommendation (development)
-1. Copy and configure **`settings.ini`** or **`.env`**.
-2. `python openbis_upload_helper\manage.py migrate`
-3. (Optional) `python openbis_upload_helper\manage.py createsuperuser`
-
-### Run the app
-
-You can locally deploy the app for development by running:
-```sh
-python openbis_upload_helper/manage.py runserver
-```
-
-This will run the Django app server:
-```sh
-Performing system checks...
-
-System check identified no issues (0 silenced).
-June 05, 2025 - 06:24:20
-Django version 5.2.1, using settings 'uploader.settings'
-Starting development server at http://127.0.0.1:8000/
-Quit the server with CONTROL-C.
-```
-
-Simply click on the localhost address, `http://127.0.0.1:8000/`, to launch the app locally.
-
-# Parsers and Dynamic Plugins
-
-This project discovers parser plugins at runtime using Python entry points.
-
-## How it works
-
-1. **Include the parser dependency**
-
-   Add the parser to your `pyproject.toml` under `[project.optional-dependencies]` in the `parsers` section.
-
-2. **Install the parser**
-
-   After adding the dependency, install it with:
-
-   ```sh
-   uv pip install -e .[parsers]
-    ```
-3. **Load the parser at runtime**
-
-    The application uses the loader function [get_entry_point_parsers]
-    It scans the configured entry point group and returns the available parser plugins dynamically.
-
-
-## Tauri dev
-
-Make sure you have installed the prerequisites for your OS: https://tauri.app/start/prerequisites/, then run:
-
-```bash
-cd openbis-upload-helper
-pnpm install
-pnpm tauri android init
-```
-
-For Desktop development, run:
+For local development, the main command is:
 
 ```bash
 pnpm tauri dev
 ```
 
-For Android development, run:
+See `INSTRUCTIONS.md` for the full prerequisite and setup process.
 
-```bash
-pnpm tauri android dev
-```
+## Issues and feedback
 
-For Python sidecar:
+Please use GitHub Issues for:
 
-```bash
-uv run pyinstaller \
-  --name openbis-helper-python \
-  src/openbis_upload_helper/main.py
-```
+- bug reports,
+- usability feedback,
+- feature requests,
+- parser requests,
+- installation or packaging problems.
 
-### Build order
-
-The build order is:
-
-1. Build the Python sidecar with PyInstaller:
-
-```bash
-uv run pyinstaller \
-  --onefile \
-  --name openbis-helper-python \
-  --collect-all bam_masterdata \
-  --collect-all openbis_parser_example \
-  --collect-all bruker_powderxrd_parser \
-  --copy-metadata bam-masterdata \
-  --copy-metadata openbis-parser-example \
-  --copy-metadata bruker-powderxrd-parser \
-  src/openbis_upload_helper/main.py
-```
-
-2. Copy or rename the resulting executable into the path/name Tauri expects, for example:
-
-```
-src-tauri/binaries/openbis-helper-python-x86_64-unknown-linux-gnu
-```
-
-3. Then build Tauri:
-
-```bash
-pnpm tauri build
-```
+When reporting a parser request, include representative example data whenever possible.
