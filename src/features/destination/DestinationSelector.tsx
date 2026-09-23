@@ -18,6 +18,8 @@ interface DestinationSelectorProps {
   loading?: boolean;
   error?: string | null;
 
+  getOptionLabel?: (option: string) => string;
+
   onChange: (value: string) => void;
 }
 
@@ -33,6 +35,7 @@ export function DestinationSelector({
   disabled = false,
   loading = false,
   error = null,
+  getOptionLabel = (option) => option,
   onChange,
 }: DestinationSelectorProps) {
   const [open, setOpen] = useState(false);
@@ -54,12 +57,24 @@ export function DestinationSelector({
       return options;
     }
 
-    return options.filter((option) =>
-      option
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [options, normalizedValue]);
+    return options.filter((option) => {
+      const optionLabel =
+        getOptionLabel(option)
+          .toLowerCase();
+
+      const optionValue =
+        option.toLowerCase();
+
+      return (
+        optionLabel.includes(query) ||
+        optionValue.includes(query)
+      );
+    });
+  }, [
+    options,
+    normalizedValue,
+    getOptionLabel,
+  ]);
 
   const visibleOptions =
   filtering
@@ -71,6 +86,19 @@ export function DestinationSelector({
     normalizedValue.length > 0 &&
     !exists &&
     filteredOptions.length === 0;
+
+  const selectedOption =
+    options.find(
+      (option) =>
+        option.toLowerCase() ===
+        normalizedValue.toLowerCase(),
+    );
+
+  const inputValue =
+    !filtering &&
+    selectedOption
+      ? getOptionLabel(selectedOption)
+      : value;
 
   function selectOption(option: string) {
     onChange(option);
@@ -94,7 +122,7 @@ export function DestinationSelector({
         <input
           id={id}
           type="text"
-          value={value}
+          value={inputValue}
           autoComplete="off"
           disabled={disabled || loading}
           placeholder={
@@ -139,7 +167,7 @@ export function DestinationSelector({
                     selectOption(option);
                   }}
                 >
-                  {option}
+                  {getOptionLabel(option)}
                 </button>
               ))}
             </div>

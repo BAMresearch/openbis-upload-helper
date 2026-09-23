@@ -49,9 +49,14 @@ class ProjectsResult(BaseModel):
     error: str | None = None
 
 
+class CollectionOption(BaseModel):
+    code: str
+    label: str
+
+
 class CollectionsResult(BaseModel):
     success: bool
-    collections: list[str] = Field(
+    collections: list[CollectionOption] = Field(
         default_factory=list,
     )
     error: str | None = None
@@ -310,6 +315,20 @@ def get_projects(
         )
 
 
+def get_collection_label(collection) -> str:
+    name = None
+
+    try:
+        name = collection.p.get("$name")
+    except Exception:
+        pass
+
+    if name:
+        name = str(name).strip()
+
+    return name or collection.code
+
+
 def get_collections(
     request: CollectionsRequest,
 ) -> CollectionsResult:
@@ -331,9 +350,16 @@ def get_collections(
 
         project = projects[0]
 
-        collections = sorted(
-            (collection.code for collection in project.get_collections()),
-            key=str.casefold,
+        collections = [
+            CollectionOption(
+                code=collection.code,
+                label=get_collection_label(collection),
+            )
+            for collection in project.get_collections()
+        ]
+
+        collections.sort(
+            key=lambda collection: collection.label.casefold(),
         )
 
         return CollectionsResult(
