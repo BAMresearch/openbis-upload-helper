@@ -262,7 +262,10 @@ def get_spaces(
             request,
         )
 
-        spaces = [space.code for space in openbis.get_spaces()]
+        spaces = sorted(
+            (space.code for space in openbis.get_spaces()),
+            key=str.casefold,
+        )
 
         return SpacesResult(
             success=True,
@@ -287,12 +290,10 @@ def get_projects(
             request,
         )
 
-        projects = [
-            project.code
-            for project in openbis.get_projects(
-                space=request.space,
-            )
-        ]
+        projects = sorted(
+            (project.code for project in openbis.get_projects(space=request.space)),
+            key=str.casefold,
+        )
 
         return ProjectsResult(
             success=True,
@@ -330,7 +331,10 @@ def get_collections(
 
         project = projects[0]
 
-        collections = [collection.code for collection in project.get_collections()]
+        collections = sorted(
+            (collection.code for collection in project.get_collections()),
+            key=str.casefold,
+        )
 
         return CollectionsResult(
             success=True,
