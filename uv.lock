@@ -36,8 +36,8 @@ wheels = [
 
 [[package]]
 name = "bam-masterdata"
-version = "0.13.3"
-source = { registry = "https://pypi.org/simple" }
+version = "0.14.1.dev4+gf18fd832f"
+source = { git = "https://github.com/BAMresearch/bam-masterdata.git?rev=main#f18fd832fc7c5066470fc1053f1cc57d2ba09a52" }
 dependencies = [
     { name = "click" },
     { name = "h5py" },
@@ -50,9 +50,15 @@ dependencies = [
     { name = "rdflib" },
     { name = "structlog" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e6/12/0df2bb3cee12b3920dd0ea74eb63bbb9dea0b88bc7bcdd2fe98923848a2f/bam_masterdata-0.13.3.tar.gz", hash = "sha256:06407187dd54455838d8300e2c5b8f6a7c9e6c6d78b7d4ce8626870ccf9b6c8c", size = 2353711, upload-time = "2026-09-15T12:40:33.217Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ea/90/26dc86443736db5b0c9d17cb1212dd35f14b21ceca74cbb4c828979ea145/bam_masterdata-0.13.3-py3-none-any.whl", hash = "sha256:a4feeedbfacfb0cbee53e5846dd1c92700ebfe8eb9eb11aeb8ab3e02463b7b6c", size = 553594, upload-time = "2026-09-15T12:40:31.816Z" },
+
+[[package]]
+name = "bam-upload-parsers"
+version = "0.1.dev3+gf4f686d44"
+source = { git = "https://github.com/BAMresearch/openbis-metadata-parsers?rev=main#f4f686d44c61b9d56c1abdcb12b72ab27486b0c6" }
+dependencies = [
+    { name = "bam-masterdata" },
+    { name = "nmrglue" },
+    { name = "numpy" },
 ]
 
 [[package]]
@@ -804,6 +810,19 @@ wheels = [
 ]
 
 [[package]]
+name = "nmrglue"
+version = "0.12"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e3/f1/78116ccf61f7db0296a9d3ca5403fe20473f2ec48610692aede33324d8eb/nmrglue-0.12.tar.gz", hash = "sha256:446ef5f81c90ee15adab6e5d6e9b7a64872eca468076c151fda997eea759e07c", size = 223132, upload-time = "2026-08-16T22:51:49.813Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f2/fd/bd5644752f659073e668672d6111b4539bb1d61e9f8f9d19ae19eb2bcfda/nmrglue-0.12-py2.py3-none-any.whl", hash = "sha256:94fba756e0ac5a764c065fe29a3b985518cc2bfab51b9001f36a4d18641eeedb", size = 238112, upload-time = "2026-08-16T22:51:48.61Z" },
+]
+
+[[package]]
 name = "numpy"
 version = "2.5.2"
 source = { registry = "https://pypi.org/simple" }
@@ -872,6 +891,7 @@ version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "bam-masterdata" },
+    { name = "bam-upload-parsers" },
     { name = "bruker-powderxrd-parser" },
     { name = "creep-test-parser" },
     { name = "openbis-parser-example" },
@@ -891,6 +911,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "bam-masterdata", specifier = ">=0.13.3" },
+    { name = "bam-upload-parsers", git = "https://github.com/BAMresearch/openbis-metadata-parsers?rev=main" },
     { name = "bruker-powderxrd-parser", specifier = ">=0.1.0" },
     { name = "creep-test-parser", git = "https://github.com/BAMresearch/creep-test-parser.git?rev=main" },
     { name = "openbis-parser-example", specifier = ">=1.0.0" },
