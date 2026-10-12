@@ -11,6 +11,10 @@ dependencies = [
     "requests>=2.32",
     "openbis-parser-example>=1.0.0",
     "bruker-powderxrd-parser>=0.1.0",
+    "sigmabam2openbis @ git+https://github.com/BAMresearch/sigmabam2openbis.git@main",
+    "tof-sims-parser @ git+https://github.com/BAMresearch/Tof-Sims-Parser.git@v0.0.1-alpha3",
+    "creep-test-parser @ git+https://github.com/BAMresearch/creep-test-parser.git@main",
+    "bam-upload-parsers @ git+https://github.com/BAMresearch/openbis-metadata-parsers@main",
 ]
 
 [dependency-groups]
