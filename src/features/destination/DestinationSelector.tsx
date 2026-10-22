@@ -21,6 +21,7 @@ interface DestinationSelectorProps {
   getOptionLabel?: (option: string) => string;
 
   onChange: (value: string) => void;
+  onBlur?: () => void;
 }
 
 
@@ -37,6 +38,7 @@ export function DestinationSelector({
   error = null,
   getOptionLabel = (option) => option,
   onChange,
+  onBlur,
 }: DestinationSelectorProps) {
   const [open, setOpen] = useState(false);
   const [filtering, setFiltering] = useState(false);
@@ -137,6 +139,9 @@ export function DestinationSelector({
             onChange(event.currentTarget.value);
             setFiltering(true);
             setOpen(true);
+          }}
+          onBlur={() => {
+            onBlur?.();
           }}
         />
 

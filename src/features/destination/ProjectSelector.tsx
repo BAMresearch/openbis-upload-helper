@@ -9,6 +9,9 @@ import {
 import {
   DestinationSelector,
 } from "./DestinationSelector";
+import {
+  normalizeDestinationCode,
+} from "./normalizeDestination";
 
 
 interface ProjectSelectorProps {
@@ -102,6 +105,14 @@ export function ProjectSelector({
       loading={loading}
       error={error}
       onChange={onChange}
+      onBlur={() => {
+        const normalized =
+          normalizeDestinationCode(value);
+
+        if (normalized !== value) {
+          onChange(normalized);
+        }
+      }}
     />
   );
 }

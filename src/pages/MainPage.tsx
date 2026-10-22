@@ -8,6 +8,10 @@ import {
 } from "../features/support/SupportButton";
 
 import {
+  normalizeDestinationCode,
+} from "../features/destination/normalizeDestination";
+
+import {
   CollectionSelector,
 } from "../features/destination/CollectionSelector";
 
@@ -324,13 +328,9 @@ export function MainPage({
             {processingReady && (
               <ProcessingReview
                 space={space}
-                project={project}
-                collection={
-                  collection
-                }
-                plan={
-                  processingPlan
-                }
+                project={normalizeDestinationCode(project)}
+                collection={normalizeDestinationCode(collection)}
+                plan={processingPlan}
               />
             )}
           </div>
