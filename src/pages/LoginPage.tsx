@@ -34,6 +34,10 @@ import {
   login,
 } from "../features/auth/auth";
 
+import {
+  SupportButton,
+} from "../features/support/SupportButton";
+
 
 interface LoginPageProps {
   onLogin: () => void;
@@ -117,6 +121,10 @@ export function LoginPage({
       className="login-page"
       aria-busy={loading}
     >
+      <div className="login-support">
+        <SupportButton />
+      </div>
+
       <section
         className="login-card"
         aria-hidden={

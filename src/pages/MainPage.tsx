@@ -4,6 +4,10 @@ import {
 } from "react";
 
 import {
+  SupportButton,
+} from "../features/support/SupportButton";
+
+import {
   CollectionSelector,
 } from "../features/destination/CollectionSelector";
 
@@ -154,9 +158,17 @@ export function MainPage({
           openBIS Upload Helper
         </h1>
 
-        <button onClick={onLogout}>
-          Log out
-        </button>
+        <div className="app-header-actions">
+          <SupportButton />
+
+          <button
+            type="button"
+            className="app-logout-button"
+            onClick={onLogout}
+          >
+            Log out
+          </button>
+        </div>
       </header>
 
 

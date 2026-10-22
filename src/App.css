@@ -371,6 +371,66 @@ button {
   background: var(--background);
 }
 
+.support-button {
+  width: 2.25rem;
+  height: 2.25rem;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid var(--primary);
+  border-radius: 50%;
+
+  background: transparent;
+  color: var(--primary);
+
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+
+.support-button:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+
+
+.support-button:active {
+  background: var(--primary-active);
+  border-color: var(--primary-active);
+  color: #ffffff;
+}
+
+
+.support-button:focus-visible {
+  outline: none;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(220, 0, 50, 0.18);
+}
+
+.app-header-actions {
+  display: flex;
+  align-items: center;
+
+  gap: 0.65rem;
+}
+
+
+.login-support {
+  position: fixed;
+
+  top: 1rem;
+  right: 1rem;
+}
+
 .app-header {
   min-height: 68px;
 
@@ -395,7 +455,7 @@ button {
   color: var(--bam-blue-darkest);
 }
 
-.app-header button {
+.app-logout-button {
   padding: 0.5rem 0.85rem;
 
   border: 1px solid var(--bam-red-dark);
