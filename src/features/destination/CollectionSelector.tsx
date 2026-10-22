@@ -12,6 +12,9 @@ import type {
 import {
   DestinationSelector,
 } from "./DestinationSelector";
+import {
+  normalizeDestinationCode,
+} from "./normalizeDestination";
 
 
 interface CollectionSelectorProps {
@@ -125,6 +128,14 @@ export function CollectionSelector({
       error={error}
       getOptionLabel={getCollectionLabel}
       onChange={onChange}
+      onBlur={() => {
+        const normalized =
+          normalizeDestinationCode(value);
+
+        if (normalized !== value) {
+          onChange(normalized);
+        }
+      }}
     />
   );
 }
