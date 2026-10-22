@@ -5,16 +5,16 @@ description = "Desktop helper for parsing and uploading scientific data to openB
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "bam-masterdata>=0.13.3",
+    "bam-masterdata>=0.15.0",
     "pybis>=1.37.5",
     "pydantic>=2.13.5",
     "requests>=2.32",
-    "openbis-parser-example>=1.0.0",
-    "bruker-powderxrd-parser>=0.1.0",
-    "sigmabam2openbis >=0.0.2",
-    "tof-sims-parser >=0.0.1",
-    "creep-test-parser >=0.0.1",
-    "openbis-instrument-data-readers >=0.0.2",
+    "openbis-parser-example>=1.0.1",
+    "bruker-powderxrd-parser>=1.0.0",
+    "sigmabam2openbis>=1.0.0",
+    "openbis-parser-tofsims>=1.0.2",
+    "creep-test-parser>=1.0.0",
+    "openbis-instrument-data-readers>=1.0.0"
 ]
 
 [dependency-groups]
