@@ -15,9 +15,15 @@ export interface ProjectsResult {
 }
 
 
+export interface CollectionOption {
+  code: string;
+  label: string;
+}
+
+
 export interface CollectionsResult {
   success: boolean;
-  collections: string[];
+  collections: CollectionOption[];
   error?: string;
 }
 

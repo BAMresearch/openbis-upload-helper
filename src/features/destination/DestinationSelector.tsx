@@ -18,6 +18,8 @@ interface DestinationSelectorProps {
   loading?: boolean;
   error?: string | null;
 
+  getOptionLabel?: (option: string) => string;
+
   onChange: (value: string) => void;
 }
 
@@ -33,9 +35,11 @@ export function DestinationSelector({
   disabled = false,
   loading = false,
   error = null,
+  getOptionLabel = (option) => option,
   onChange,
 }: DestinationSelectorProps) {
   const [open, setOpen] = useState(false);
+  const [filtering, setFiltering] = useState(false);
 
   const normalizedValue = value.trim();
 
@@ -53,12 +57,29 @@ export function DestinationSelector({
       return options;
     }
 
-    return options.filter((option) =>
-      option
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [options, normalizedValue]);
+    return options.filter((option) => {
+      const optionLabel =
+        getOptionLabel(option)
+          .toLowerCase();
+
+      const optionValue =
+        option.toLowerCase();
+
+      return (
+        optionLabel.includes(query) ||
+        optionValue.includes(query)
+      );
+    });
+  }, [
+    options,
+    normalizedValue,
+    getOptionLabel,
+  ]);
+
+  const visibleOptions =
+  filtering
+    ? filteredOptions
+    : options;
 
   const isNewValue =
     allowNew &&
@@ -66,8 +87,22 @@ export function DestinationSelector({
     !exists &&
     filteredOptions.length === 0;
 
+  const selectedOption =
+    options.find(
+      (option) =>
+        option.toLowerCase() ===
+        normalizedValue.toLowerCase(),
+    );
+
+  const inputValue =
+    !filtering &&
+    selectedOption
+      ? getOptionLabel(selectedOption)
+      : value;
+
   function selectOption(option: string) {
     onChange(option);
+    setFiltering(false);
     setOpen(false);
   }
 
@@ -87,7 +122,7 @@ export function DestinationSelector({
         <input
           id={id}
           type="text"
-          value={value}
+          value={inputValue}
           autoComplete="off"
           disabled={disabled || loading}
           placeholder={
@@ -100,6 +135,7 @@ export function DestinationSelector({
           }}
           onChange={(event) => {
             onChange(event.currentTarget.value);
+            setFiltering(true);
             setOpen(true);
           }}
         />
@@ -110,6 +146,7 @@ export function DestinationSelector({
           aria-label={`Show available ${label.toLowerCase()}s`}
           disabled={disabled || loading}
           onClick={() => {
+            setFiltering(false);
             setOpen((current) => !current);
           }}
         >
@@ -119,9 +156,9 @@ export function DestinationSelector({
         {open &&
           !disabled &&
           !loading &&
-          filteredOptions.length > 0 && (
+          visibleOptions.length > 0 && (
             <div className="combobox-options">
-              {filteredOptions.map((option) => (
+              {visibleOptions.map((option) => (
                 <button
                   key={option}
                   type="button"
@@ -130,7 +167,7 @@ export function DestinationSelector({
                     selectOption(option);
                   }}
                 >
-                  {option}
+                  {getOptionLabel(option)}
                 </button>
               ))}
             </div>

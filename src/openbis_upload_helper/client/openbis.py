@@ -49,9 +49,14 @@ class ProjectsResult(BaseModel):
     error: str | None = None
 
 
+class CollectionOption(BaseModel):
+    code: str
+    label: str
+
+
 class CollectionsResult(BaseModel):
     success: bool
-    collections: list[str] = Field(
+    collections: list[CollectionOption] = Field(
         default_factory=list,
     )
     error: str | None = None
@@ -262,7 +267,10 @@ def get_spaces(
             request,
         )
 
-        spaces = [space.code for space in openbis.get_spaces()]
+        spaces = sorted(
+            (space.code for space in openbis.get_spaces()),
+            key=str.casefold,
+        )
 
         return SpacesResult(
             success=True,
@@ -287,12 +295,10 @@ def get_projects(
             request,
         )
 
-        projects = [
-            project.code
-            for project in openbis.get_projects(
-                space=request.space,
-            )
-        ]
+        projects = sorted(
+            (project.code for project in openbis.get_projects(space=request.space)),
+            key=str.casefold,
+        )
 
         return ProjectsResult(
             success=True,
@@ -307,6 +313,20 @@ def get_projects(
                 fallback=("Could not retrieve projects from openBIS."),
             ),
         )
+
+
+def get_collection_label(collection) -> str:
+    name = None
+
+    try:
+        name = collection.p.get("$name")
+    except Exception:
+        pass
+
+    if name:
+        name = str(name).strip()
+
+    return name or collection.code
 
 
 def get_collections(
@@ -330,7 +350,17 @@ def get_collections(
 
         project = projects[0]
 
-        collections = [collection.code for collection in project.get_collections()]
+        collections = [
+            CollectionOption(
+                code=collection.code,
+                label=get_collection_label(collection),
+            )
+            for collection in project.get_collections()
+        ]
+
+        collections.sort(
+            key=lambda collection: collection.label.casefold(),
+        )
 
         return CollectionsResult(
             success=True,

@@ -125,9 +125,15 @@ struct CollectionsRequest {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+struct CollectionOption {
+    code: String,
+    label: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 struct CollectionsResult {
     success: bool,
-    collections: Vec<String>,
+    collections: Vec<CollectionOption>,
     error: Option<String>,
 }
 

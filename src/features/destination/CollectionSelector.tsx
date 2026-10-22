@@ -6,6 +6,9 @@ import {
 import {
   getCollections,
 } from "./destination";
+import type {
+  CollectionOption,
+} from "./destination";
 import {
   DestinationSelector,
 } from "./DestinationSelector";
@@ -28,7 +31,7 @@ export function CollectionSelector({
   onChange,
 }: CollectionSelectorProps) {
   const [collections, setCollections] =
-    useState<string[]>([]);
+    useState<CollectionOption[]>([]);
 
   const [loading, setLoading] =
     useState(false);
@@ -87,18 +90,40 @@ export function CollectionSelector({
     projectExists,
   ]);
 
+  const collectionCodes =
+    collections.map(
+      (collection) =>
+        collection.code,
+    );
+
+  function getCollectionLabel(
+    code: string,
+  ): string {
+    const collection =
+      collections.find(
+        (item) =>
+          item.code === code,
+      );
+
+    return (
+      collection?.label ??
+      code
+    );
+  }
+
   return (
     <DestinationSelector
       id="collection"
       label="Collection"
       value={value}
-      options={collections}
+      options={collectionCodes}
       placeholder="Select, enter, or leave empty"
       allowNew
       optional
       disabled={!project}
       loading={loading}
       error={error}
+      getOptionLabel={getCollectionLabel}
       onChange={onChange}
     />
   );
