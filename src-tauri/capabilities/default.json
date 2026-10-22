@@ -8,6 +8,14 @@
   "permissions": [
     "core:event:default",
     "core:webview:allow-set-webview-zoom",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://github.com/BAMresearch/openbis-upload-helper/issues"
+        }
+      ]
+    }
   ]
 }
