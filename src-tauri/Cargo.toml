@@ -17,12 +17,13 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2.12", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tauri-plugin-dialog = "2"
+
+tauri-plugin-dialog = "2.8"
 tauri-plugin-shell = "2"
-tauri-plugin-opener = "2.7.1"
+tauri-plugin-opener = "2.7"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

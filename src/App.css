@@ -413,7 +413,7 @@ button {
 
   box-shadow:
     0 0 0 3px
-    rgba(220, 0, 50, 0.18);
+    var(--focus-ring);
 }
 
 .app-header-actions {
@@ -472,15 +472,16 @@ button {
     border-color 0.15s ease;
 }
 
-.app-header button:hover {
+.app-logout-button:hover {
   background: var(--bam-red-dark);
   border-color: var(--bam-red-dark);
   color: #ffffff;
 }
 
-.app-header button:active {
+.app-logout-button:active {
   background: var(--bam-red-darker);
   border-color: var(--bam-red-darker);
+  color: #ffffff;
 }
 
 .main-content {
