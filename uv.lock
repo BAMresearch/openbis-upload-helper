@@ -737,15 +737,15 @@ wheels = [
 
 [[package]]
 name = "openbis-parser-tofsims"
-version = "1.0.2"
+version = "1.0.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bam-masterdata" },
     { name = "pyspm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8c/2c/9d4e74531479dc4825887e481d54b176e7243315eb62cec96e6a512d73f1/openbis_parser_tofsims-1.0.2.tar.gz", hash = "sha256:52c117d9301df1b1be90afac7d8b5bee1c5afa24ca8917891b7d5c6486c3154d", size = 103996, upload-time = "2026-10-22T10:18:37.393Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a2/50/a060ecbf1dcd3e6e8d4cd81ac6e8aedbfab02353958783d7b80bec513931/openbis_parser_tofsims-1.0.5.tar.gz", hash = "sha256:e44e8ea8cd0e5a9359a25e5dae7953369ffa753760b6f8919c3830eb15dfaaf6", size = 104024, upload-time = "2026-10-23T19:22:50.443Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/31/23/1249eaf554edc32cac4be0f3bc3188ddf8805427b8193f4b4e61d9cfbd83/openbis_parser_tofsims-1.0.2-py3-none-any.whl", hash = "sha256:2c87371fd3b3d09a3aa0ea424d0c41878c410e5ac008895e880d4c7bb10e4cee", size = 19528, upload-time = "2026-10-22T10:18:36.181Z" },
+    { url = "https://files.pythonhosted.org/packages/72/e9/b31f2a7a98b42b01abfceff243aae036b0d95a6613741c4df83a43421b53/openbis_parser_tofsims-1.0.5-py3-none-any.whl", hash = "sha256:74ad11c558237f9597f4a64fefa501ffa662f70e80381352f1ec90cd76ccb59b", size = 19523, upload-time = "2026-10-23T19:22:48.906Z" },
 ]
 
 [[package]]
@@ -778,7 +778,7 @@ requires-dist = [
     { name = "creep-test-parser", specifier = ">=1.0.0" },
     { name = "openbis-instrument-data-readers", specifier = ">=1.0.0" },
     { name = "openbis-parser-example", specifier = ">=1.0.1" },
-    { name = "openbis-parser-tofsims", specifier = ">=1.0.2" },
+    { name = "openbis-parser-tofsims", specifier = ">=1.0.5" },
     { name = "pybis", specifier = ">=1.37.5" },
     { name = "pydantic", specifier = ">=2.13.5" },
     { name = "requests", specifier = ">=2.32" },
