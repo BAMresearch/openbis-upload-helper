@@ -237,9 +237,18 @@ src-tauri/tauri.conf.json
 package.json
 ```
 
-Do not manually update only one of these files.
+The application version is defined in `pyproject.toml`.
 
-Use the release preparation script instead.
+
+Before creating a release:
+
+1. Update `project.version` in `pyproject.toml`.
+2. Run `uv run python scripts/sync_version.py`.
+3. Run `uv run python scripts/check_version.py`.
+4. Commit the synchronized version changes.
+5. Create the Git tag as `v<version>`.
+
+CI verifies that `package.json` and `src-tauri/tauri.conf.json` match the version in `pyproject.toml`. Tagged release builds also verify that the Git tag matches the application version.
 
 ---
 
