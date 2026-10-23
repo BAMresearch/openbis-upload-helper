@@ -1133,8 +1133,6 @@ fn run_processing_command(
     )
 }
 
-
-
 #[tauri::command]
 async fn login(
     app: tauri::AppHandle,
@@ -1255,19 +1253,69 @@ async fn login(
     )
 }
 
+fn clear_auth_state(
+    state: &AppState,
+) -> Result<(), String> {
+    {
+        let processing = state
+            .processing
+            .lock()
+            .map_err(|_| {
+                "Failed to access processing state."
+            })?;
+
+        if processing.running {
+            return Err(
+                "Cannot log out while processing is running. \
+                 Cancel processing first."
+                    .to_string(),
+            );
+        }
+    }
+
+    let mut auth = state
+        .auth
+        .lock()
+        .map_err(|_| {
+            "Failed to access authentication state."
+        })?;
+
+    *auth = None;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn logout(
+    state: tauri::State<AppState>,
+) -> Result<(), String> {
+    clear_auth_state(&state)
+}
+
+fn get_auth_state(
+    state: &AppState,
+) -> Result<AuthState, String> {
+    let auth = state
+        .auth
+        .lock()
+        .map_err(|_| {
+            "Failed to access authentication state."
+                .to_string()
+        })?;
+
+    auth
+        .clone()
+        .ok_or_else(|| {
+            "Not authenticated.".to_string()
+        })
+}
+
 #[tauri::command]
 fn get_spaces(
     app: tauri::AppHandle,
     state: tauri::State<AppState>,
 ) -> Result<SpacesResult, String> {
-    let auth = {
-        let stored_auth = state
-            .auth
-            .lock()
-            .map_err(|_| "Failed to access authentication state.")?;
-
-        stored_auth.clone().ok_or("Not authenticated.")?
-    };
+    let auth = get_auth_state(&state)?;
 
     let payload = serde_json::to_string(&auth).map_err(|error| error.to_string())?;
 
@@ -1287,14 +1335,7 @@ fn get_projects(
     app: tauri::AppHandle,
     state: tauri::State<AppState>, space: String,
 ) -> Result<ProjectsResult, String> {
-    let auth = {
-        let stored_auth = state
-            .auth
-            .lock()
-            .map_err(|_| "Failed to access authentication state.")?;
-
-        stored_auth.clone().ok_or("Not authenticated.")?
-    };
+    let auth = get_auth_state(&state)?;
 
     let request = ProjectsRequest {
         server_url: auth.server_url,
@@ -1322,14 +1363,7 @@ fn get_collections(
     space: String,
     project: String,
 ) -> Result<CollectionsResult, String> {
-    let auth = {
-        let stored_auth = state
-            .auth
-            .lock()
-            .map_err(|_| "Failed to access authentication state.")?;
-
-        stored_auth.clone().ok_or("Not authenticated.")?
-    };
+    let auth = get_auth_state(&state)?;
 
     let request = CollectionsRequest {
         server_url: auth.server_url,
@@ -1547,23 +1581,7 @@ async fn process_sources(
         processing.child = None;
     }
 
-
-    let auth = {
-        let stored_auth = state
-            .auth
-            .lock()
-            .map_err(|_| {
-                "Failed to access authentication state."
-            })?;
-
-
-        stored_auth
-            .clone()
-            .ok_or(
-                "Not authenticated.",
-            )?
-    };
-
+    let auth = get_auth_state(&state)?;
 
     let python_jobs =
         jobs
@@ -1801,6 +1819,7 @@ pub fn run() {
             .invoke_handler(
                 tauri::generate_handler![
                     login,
+                    logout,
                     get_spaces,
                     get_projects,
                     get_collections,
@@ -1831,4 +1850,107 @@ pub fn run() {
             }
         },
     );
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn app_state_with_auth() -> AppState {
+        AppState {
+            auth: Mutex::new(
+                Some(
+                    AuthState {
+                        server_url:
+                            "https://example.org"
+                                .to_string(),
+                        token:
+                            "test-token"
+                                .to_string(),
+                    },
+                ),
+            ),
+            processing: Arc::new(
+                Mutex::new(
+                    ProcessingState {
+                        running: false,
+                        cancel_requested: false,
+                        child: None,
+                    },
+                ),
+            ),
+        }
+    }
+
+    #[test]
+    fn logout_clears_authentication_state() {
+        let state = app_state_with_auth();
+
+        clear_auth_state(&state)
+            .expect("logout should succeed");
+
+        let auth = state
+            .auth
+            .lock()
+            .expect(
+                "authentication state should be accessible",
+            );
+
+        assert!(auth.is_none());
+    }
+
+    #[test]
+    fn logout_is_rejected_while_processing() {
+        let state = app_state_with_auth();
+
+        {
+            let mut processing = state
+                .processing
+                .lock()
+                .expect(
+                    "processing state should be accessible",
+                );
+
+            processing.running = true;
+        }
+
+        let result =
+            clear_auth_state(&state);
+
+        assert_eq!(
+            result,
+            Err(
+                "Cannot log out while processing is running. \
+                 Cancel processing first."
+                    .to_string(),
+            ),
+        );
+
+        let auth = state
+            .auth
+            .lock()
+            .expect(
+                "authentication state should be accessible",
+            );
+
+        assert!(auth.is_some());
+    }
+
+    #[test]
+    fn auth_state_is_unavailable_after_logout() {
+        let state = app_state_with_auth();
+
+        clear_auth_state(&state)
+            .expect("logout should succeed");
+
+        let result =
+            get_auth_state(&state);
+
+        assert!(matches!(
+            result,
+            Err(ref error)
+                if error == "Not authenticated."
+        ));
+    }
 }

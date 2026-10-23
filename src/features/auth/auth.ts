@@ -26,3 +26,8 @@ export async function login(
     personalAccessToken: credentials.personalAccessToken,
   });
 }
+
+
+export async function logout(): Promise<void> {
+  await invoke("logout");
+}

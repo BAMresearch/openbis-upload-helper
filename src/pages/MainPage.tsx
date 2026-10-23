@@ -4,6 +4,10 @@ import {
 } from "react";
 
 import {
+  logout,
+} from "../features/auth/auth";
+
+import {
   SupportButton,
 } from "../features/support/SupportButton";
 
@@ -57,6 +61,12 @@ interface MainPageProps {
 export function MainPage({
   onLogout,
 }: MainPageProps) {
+  const [logoutError, setLogoutError] =
+    useState<string | null>(null);
+
+  const [loggingOut, setLoggingOut] =
+    useState(false);
+
   const [space, setSpace] =
     useState("");
 
@@ -155,6 +165,29 @@ export function MainPage({
   }
 
 
+  async function handleLogout() {
+    if (loggingOut) {
+      return;
+    }
+
+    setLogoutError(null);
+    setLoggingOut(true);
+
+    try {
+      await logout();
+      onLogout();
+    } catch (error) {
+      setLogoutError(
+        error instanceof Error
+          ? error.message
+          : String(error),
+      );
+    } finally {
+      setLoggingOut(false);
+    }
+  }
+
+
   return (
     <main className="main-page">
       <header className="app-header">
@@ -168,11 +201,23 @@ export function MainPage({
           <button
             type="button"
             className="app-logout-button"
-            onClick={onLogout}
+            onClick={handleLogout}
+            disabled={loggingOut}
           >
-            Log out
+            {loggingOut
+              ? "Logging out..."
+              : "Log out"}
           </button>
         </div>
+
+        {logoutError && (
+          <p
+            className="login-error"
+            role="alert"
+          >
+            {logoutError}
+          </p>
+        )}
       </header>
 
 
