@@ -4,6 +4,7 @@ import platform
 import shutil
 import subprocess
 import sys
+from importlib import metadata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,6 +14,8 @@ BUILD_DIR = ROOT / "build"
 BINARIES_DIR = ROOT / "src-tauri" / "binaries"
 
 BASE_NAME = "openbis-helper-python"
+
+PARSER_ENTRY_POINT_GROUP = "bam.parsers"
 
 
 def tauri_target_triple() -> str:
@@ -43,6 +46,46 @@ def tauri_target_triple() -> str:
     raise RuntimeError(f"Unsupported platform: {system} / {machine}")
 
 
+def parser_build_arguments() -> list[str]:
+    arguments: list[str] = []
+    seen: set[tuple[str, str]] = set()
+
+    entry_points = metadata.entry_points(
+        group=PARSER_ENTRY_POINT_GROUP,
+    )
+
+    for entry_point in entry_points:
+        distribution = entry_point.dist
+
+        if distribution is None:
+            raise RuntimeError(
+                f"Parser entry point '{entry_point.name}' "
+                "does not belong to a distribution."
+            )
+
+        module_name = entry_point.value.split(":", maxsplit=1)[0].split(
+            ".", maxsplit=1
+        )[0]
+
+        package = (module_name, distribution.name)
+
+        if package in seen:
+            continue
+
+        seen.add(package)
+
+        arguments.extend(
+            [
+                "--collect-all",
+                module_name,
+                "--copy-metadata",
+                distribution.name,
+            ]
+        )
+
+    return arguments
+
+
 def main() -> None:
     target = tauri_target_triple()
 
@@ -59,16 +102,9 @@ def main() -> None:
         BASE_NAME,
         "--collect-all",
         "bam_masterdata",
-        "--collect-all",
-        "openbis_parser_example",
-        "--collect-all",
-        "bruker_powderxrd_parser",
         "--copy-metadata",
         "bam-masterdata",
-        "--copy-metadata",
-        "openbis-parser-example",
-        "--copy-metadata",
-        "bruker-powderxrd-parser",
+        *parser_build_arguments(),
         str(ROOT / "src" / "openbis_upload_helper" / "main.py"),
     ]
 
