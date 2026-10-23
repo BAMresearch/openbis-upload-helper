@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import platform
 import shutil
 import subprocess
@@ -10,7 +11,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 DIST_DIR = ROOT / "dist"
-BUILD_DIR = ROOT / "build"
 BINARIES_DIR = ROOT / "src-tauri" / "binaries"
 
 BASE_NAME = "openbis-helper-python"
@@ -86,6 +86,47 @@ def parser_build_arguments() -> list[str]:
     return arguments
 
 
+def expected_parser_ids() -> set[str]:
+    return {
+        entry_point.name
+        for entry_point in metadata.entry_points(group=PARSER_ENTRY_POINT_GROUP)
+    }
+
+
+def verify_sidecar_parsers(executable: Path) -> None:
+    result = subprocess.run(
+        [str(executable), "parsers"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+
+    if not payload.get("success"):
+        raise RuntimeError(
+            f"Frozen sidecar could not discover parsers: {payload.get('error')}"
+        )
+
+    packaged_parser_ids = {parser["id"] for parser in payload.get("parsers", [])}
+
+    expected = expected_parser_ids()
+
+    if packaged_parser_ids != expected:
+        missing = expected - packaged_parser_ids
+        unexpected = packaged_parser_ids - expected
+
+        raise RuntimeError(
+            "Frozen sidecar parser discovery does not "
+            "match the build environment. "
+            f"Missing: {sorted(missing)}. "
+            f"Unexpected: {sorted(unexpected)}."
+        )
+
+    print(f"Frozen sidecar parser discovery verified: {sorted(packaged_parser_ids)}")
+
+
 def main() -> None:
     target = tauri_target_triple()
 
@@ -104,6 +145,8 @@ def main() -> None:
         "bam_masterdata",
         "--copy-metadata",
         "bam-masterdata",
+        "--collect-data",
+        "pySPM",
         *parser_build_arguments(),
         str(ROOT / "src" / "openbis_upload_helper" / "main.py"),
     ]
@@ -124,6 +167,8 @@ def main() -> None:
     shutil.copy2(source, destination)
 
     print(f"Sidecar staged at {destination}")
+
+    verify_sidecar_parsers(destination)
 
 
 if __name__ == "__main__":

@@ -52,7 +52,20 @@ def discover_parsers() -> dict[str, ParserPlugin]:
     entry_points = metadata.entry_points(group=ENTRY_POINT_GROUP)
 
     for entry_point in entry_points:
-        loaded: Any = entry_point.load()
+        try:
+            loaded: Any = entry_point.load()
+        except Exception as exc:
+            distribution = getattr(entry_point, "dist", None)
+
+            distribution_name = (
+                distribution.name
+                if distribution is not None
+                else "unknown distribution"
+            )
+
+            raise RuntimeError(
+                f"Could not load parser entry point '{entry_point.name}' from '{distribution_name}': {exc}"
+            ) from exc
 
         if not isinstance(loaded, dict):
             raise TypeError(
