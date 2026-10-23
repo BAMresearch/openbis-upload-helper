@@ -1292,19 +1292,30 @@ fn logout(
     clear_auth_state(&state)
 }
 
+fn get_auth_state(
+    state: &AppState,
+) -> Result<AuthState, String> {
+    let auth = state
+        .auth
+        .lock()
+        .map_err(|_| {
+            "Failed to access authentication state."
+                .to_string()
+        })?;
+
+    auth
+        .clone()
+        .ok_or_else(|| {
+            "Not authenticated.".to_string()
+        })
+}
+
 #[tauri::command]
 fn get_spaces(
     app: tauri::AppHandle,
     state: tauri::State<AppState>,
 ) -> Result<SpacesResult, String> {
-    let auth = {
-        let stored_auth = state
-            .auth
-            .lock()
-            .map_err(|_| "Failed to access authentication state.")?;
-
-        stored_auth.clone().ok_or("Not authenticated.")?
-    };
+    let auth = get_auth_state(&state)?;
 
     let payload = serde_json::to_string(&auth).map_err(|error| error.to_string())?;
 
@@ -1324,14 +1335,7 @@ fn get_projects(
     app: tauri::AppHandle,
     state: tauri::State<AppState>, space: String,
 ) -> Result<ProjectsResult, String> {
-    let auth = {
-        let stored_auth = state
-            .auth
-            .lock()
-            .map_err(|_| "Failed to access authentication state.")?;
-
-        stored_auth.clone().ok_or("Not authenticated.")?
-    };
+    let auth = get_auth_state(&state)?;
 
     let request = ProjectsRequest {
         server_url: auth.server_url,
@@ -1359,14 +1363,7 @@ fn get_collections(
     space: String,
     project: String,
 ) -> Result<CollectionsResult, String> {
-    let auth = {
-        let stored_auth = state
-            .auth
-            .lock()
-            .map_err(|_| "Failed to access authentication state.")?;
-
-        stored_auth.clone().ok_or("Not authenticated.")?
-    };
+    let auth = get_auth_state(&state)?;
 
     let request = CollectionsRequest {
         server_url: auth.server_url,
@@ -1584,23 +1581,7 @@ async fn process_sources(
         processing.child = None;
     }
 
-
-    let auth = {
-        let stored_auth = state
-            .auth
-            .lock()
-            .map_err(|_| {
-                "Failed to access authentication state."
-            })?;
-
-
-        stored_auth
-            .clone()
-            .ok_or(
-                "Not authenticated.",
-            )?
-    };
-
+    let auth = get_auth_state(&state)?;
 
     let python_jobs =
         jobs
@@ -1954,5 +1935,22 @@ mod tests {
             );
 
         assert!(auth.is_some());
+    }
+
+    #[test]
+    fn auth_state_is_unavailable_after_logout() {
+        let state = app_state_with_auth();
+
+        clear_auth_state(&state)
+            .expect("logout should succeed");
+
+        let result =
+            get_auth_state(&state);
+
+        assert!(matches!(
+            result,
+            Err(ref error)
+                if error == "Not authenticated."
+        ));
     }
 }
