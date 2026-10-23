@@ -1256,6 +1256,39 @@ async fn login(
 }
 
 #[tauri::command]
+fn logout(
+    state: tauri::State<AppState>,
+) -> Result<(), String> {
+    {
+        let processing = state
+            .processing
+            .lock()
+            .map_err(|_| {
+                "Failed to access processing state."
+            })?;
+
+        if processing.running {
+            return Err(
+                "Cannot log out while processing is running. \
+                 Cancel processing first."
+                    .to_string(),
+            );
+        }
+    }
+
+    let mut auth = state
+        .auth
+        .lock()
+        .map_err(|_| {
+            "Failed to access authentication state."
+        })?;
+
+    *auth = None;
+
+    Ok(())
+}
+
+#[tauri::command]
 fn get_spaces(
     app: tauri::AppHandle,
     state: tauri::State<AppState>,
@@ -1801,6 +1834,7 @@ pub fn run() {
             .invoke_handler(
                 tauri::generate_handler![
                     login,
+                    logout,
                     get_spaces,
                     get_projects,
                     get_collections,
