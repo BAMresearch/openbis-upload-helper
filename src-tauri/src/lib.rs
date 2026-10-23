@@ -1133,8 +1133,6 @@ fn run_processing_command(
     )
 }
 
-
-
 #[tauri::command]
 async fn login(
     app: tauri::AppHandle,
@@ -1255,9 +1253,8 @@ async fn login(
     )
 }
 
-#[tauri::command]
-fn logout(
-    state: tauri::State<AppState>,
+fn clear_auth_state(
+    state: &AppState,
 ) -> Result<(), String> {
     {
         let processing = state
@@ -1286,6 +1283,13 @@ fn logout(
     *auth = None;
 
     Ok(())
+}
+
+#[tauri::command]
+fn logout(
+    state: tauri::State<AppState>,
+) -> Result<(), String> {
+    clear_auth_state(&state)
 }
 
 #[tauri::command]
@@ -1865,4 +1869,90 @@ pub fn run() {
             }
         },
     );
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn app_state_with_auth() -> AppState {
+        AppState {
+            auth: Mutex::new(
+                Some(
+                    AuthState {
+                        server_url:
+                            "https://example.org"
+                                .to_string(),
+                        token:
+                            "test-token"
+                                .to_string(),
+                    },
+                ),
+            ),
+            processing: Arc::new(
+                Mutex::new(
+                    ProcessingState {
+                        running: false,
+                        cancel_requested: false,
+                        child: None,
+                    },
+                ),
+            ),
+        }
+    }
+
+    #[test]
+    fn logout_clears_authentication_state() {
+        let state = app_state_with_auth();
+
+        clear_auth_state(&state)
+            .expect("logout should succeed");
+
+        let auth = state
+            .auth
+            .lock()
+            .expect(
+                "authentication state should be accessible",
+            );
+
+        assert!(auth.is_none());
+    }
+
+    #[test]
+    fn logout_is_rejected_while_processing() {
+        let state = app_state_with_auth();
+
+        {
+            let mut processing = state
+                .processing
+                .lock()
+                .expect(
+                    "processing state should be accessible",
+                );
+
+            processing.running = true;
+        }
+
+        let result =
+            clear_auth_state(&state);
+
+        assert_eq!(
+            result,
+            Err(
+                "Cannot log out while processing is running. \
+                 Cancel processing first."
+                    .to_string(),
+            ),
+        );
+
+        let auth = state
+            .auth
+            .lock()
+            .expect(
+                "authentication state should be accessible",
+            );
+
+        assert!(auth.is_some());
+    }
 }
