@@ -12,7 +12,7 @@ dependencies = [
     "openbis-parser-example>=1.0.1",
     "bruker-powderxrd-parser>=1.0.0",
     "sigmabam2openbis>=1.0.0",
-    "openbis-parser-tofsims>=1.0.2",
+    "openbis-parser-tofsims>=1.0.5",
     "creep-test-parser>=1.0.0",
     "openbis-instrument-data-readers>=1.0.0"
 ]
