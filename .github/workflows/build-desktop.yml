@@ -67,6 +67,13 @@ jobs:
       - name: Install Python dependencies
         run: uv sync --locked
 
+      - name: Check application version consistency
+        run: uv run python scripts/check_version.py
+
+      - name: Check release tag version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: uv run python scripts/check_version.py --tag "${{ github.ref_name }}"
+
       - name: Build Python sidecar
         run: uv run python scripts/build_sidecar.py
 
