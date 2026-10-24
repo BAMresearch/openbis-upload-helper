@@ -143,6 +143,7 @@ struct ParserInfo {
     id: String,
     name: String,
     description: String,
+    distribution: Option<String>,
     version: Option<String>,
 }
 
