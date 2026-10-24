@@ -27,6 +27,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      - name: Check application version consistency
+        run: uv run python scripts/check_version.py
+
       - name: Ruff check
         run: uv run ruff check .
 
