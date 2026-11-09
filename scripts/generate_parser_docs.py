@@ -1,8 +1,8 @@
 from pathlib import Path
+import textwrap
+from openbis_upload_helper.parsers.registry import list_parsers
 
-from src.openbis_upload_helper.parsers.registry import list_parsers
-
-OUTPUT = Path("AVAILABLE_PARSERS.md")
+OUTPUT = Path("available_parsers.md")
 
 
 def generate_docs():
@@ -16,15 +16,21 @@ def generate_docs():
         "",
         "Automatically generated parser documentation.",
         "",
-        "| ID | Name | Description | Version |",
-        "| --- | --- | --- | --- |",
+        "| Name | Description | Version |",
+        "| --- | --- | --- |",
     ]
 
     for parser in result.parsers:
-        description = parser.description.replace("\n", " ").replace("|", "\\|")
+        description = "<br>".join(
+            textwrap.wrap(
+                parser.description.replace("\n", " "),
+                width=60,   # Limit the width of the description to 60 characters
+                break_long_words=False,
+                break_on_hyphens=False,
+            )
+        ).replace("|", "\\|")
 
         lines.append(
-            f"| `{parser.id}` "
             f"| {parser.name} "
             f"| {description} "
             f"| {parser.version or 'N/A'} |"
