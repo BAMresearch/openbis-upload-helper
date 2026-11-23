@@ -5,6 +5,7 @@ export interface ParserInfo {
   id: string;
   name: string;
   description: string;
+  distribution?: string;
   version?: string;
 }
 
@@ -19,7 +20,7 @@ export interface ParsersResult {
 //    {
 //    "/data/experiment/xrd": {
 //        type: "parser",
-//        parserId: "masterdata_parser_example_entry_point",
+//        parserId: "openbis_parser_example_entry_point",
 //    },
 //
 //    "/data/experiment/xrd/README.txt": {

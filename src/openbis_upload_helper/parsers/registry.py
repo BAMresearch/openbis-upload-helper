@@ -13,6 +13,7 @@ class ParserPlugin:
     id: str
     name: str
     description: str
+    distribution: str | None
     version: str | None
     parser_class: type[AbstractParser]
 
@@ -21,6 +22,7 @@ class ParserInfo(BaseModel):
     id: str
     name: str
     description: str = ""
+    distribution: str | None = None
     version: str | None = None
 
 
@@ -54,9 +56,8 @@ def discover_parsers() -> dict[str, ParserPlugin]:
     for entry_point in entry_points:
         try:
             loaded: Any = entry_point.load()
-        except Exception as exc:
             distribution = getattr(entry_point, "dist", None)
-
+        except Exception as exc:
             distribution_name = (
                 distribution.name
                 if distribution is not None
@@ -82,10 +83,13 @@ def discover_parsers() -> dict[str, ParserPlugin]:
         parser_name = loaded.get("name", entry_point.name)
         description = loaded.get("description", "")
 
+        distribution_name = distribution.name if distribution is not None else None
+
         parsers[entry_point.name] = ParserPlugin(
             id=entry_point.name,
             name=parser_name,
             description=description,
+            distribution=distribution_name,
             version=_entry_point_version(entry_point),
             parser_class=parser_class,
         )
@@ -111,6 +115,7 @@ def list_parsers() -> ParsersResult:
                 id=plugin.id,
                 name=plugin.name,
                 description=plugin.description,
+                distribution=plugin.distribution,
                 version=plugin.version,
             )
             for plugin in plugins.values()

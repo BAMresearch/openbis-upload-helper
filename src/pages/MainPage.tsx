@@ -52,6 +52,10 @@ import type {
   SourceNode,
 } from "../features/source/source";
 
+import {
+  AboutDialog,
+} from "../features/diagnostics/AboutDialog";
+
 
 interface MainPageProps {
   onLogout: () => void;
@@ -104,6 +108,8 @@ export function MainPage({
     parserAssignments,
     setParserAssignments,
   ] = useState<ParserAssignments>({});
+
+  const [aboutOpen, setAboutOpen] = useState(false);
 
 
   const destinationReady =
@@ -196,6 +202,13 @@ export function MainPage({
         </h1>
 
         <div className="app-header-actions">
+          <button
+            type="button"
+            onClick={() => setAboutOpen(true)}
+          >
+            About
+          </button>
+
           <SupportButton />
 
           <button
@@ -220,6 +233,10 @@ export function MainPage({
         )}
       </header>
 
+      <AboutDialog
+        open={aboutOpen}
+        onClose={() => setAboutOpen(false)}
+      />
 
       <section className="main-content">
         <div className="workflow-card">

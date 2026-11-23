@@ -143,15 +143,25 @@ struct ParserInfo {
     id: String,
     name: String,
     description: String,
+    distribution: Option<String>,
     version: Option<String>,
 }
-
 
 #[derive(Debug, Deserialize, Serialize)]
 struct ParsersResult {
     success: bool,
     parsers: Vec<ParserInfo>,
     error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DiagnosticsResult {
+    version: String,
+    operating_system: String,
+    architecture: String,
+    server_url: Option<String>,
+    parsers: Vec<ParserInfo>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1405,6 +1415,75 @@ fn get_parsers(
 }
 
 #[tauri::command]
+fn get_diagnostics(
+    app: tauri::AppHandle,
+    state: tauri::State<AppState>,
+) -> Result<DiagnosticsResult, String> {
+    let server_url = {
+        let auth = state
+            .auth
+            .lock()
+            .map_err(|_| {
+                "Failed to access authentication state."
+                    .to_string()
+            })?;
+
+        auth.as_ref()
+            .map(|auth| auth.server_url.clone())
+    };
+
+    let output =
+        backend::run(
+            &app,
+            "parsers",
+            "",
+        )?;
+
+    let parsers_result =
+        serde_json::from_slice::<ParsersResult>(
+            &output,
+        )
+        .map_err(|error| {
+            format!(
+                "Invalid response from Python backend: {error}"
+            )
+        })?;
+
+    if !parsers_result.success {
+        return Err(
+            parsers_result
+                .error
+                .unwrap_or_else(|| {
+                    "Could not retrieve parser information."
+                        .to_string()
+                }),
+        );
+    }
+
+    Ok(
+        DiagnosticsResult {
+            version:
+                app.package_info()
+                    .version
+                    .to_string(),
+
+            operating_system:
+                std::env::consts::OS
+                    .to_string(),
+
+            architecture:
+                std::env::consts::ARCH
+                    .to_string(),
+
+            server_url,
+
+            parsers:
+                parsers_result.parsers,
+        },
+    )
+}
+
+#[tauri::command]
 fn save_processing_logs(
     app: tauri::AppHandle,
     file_name: String,
@@ -1824,6 +1903,7 @@ pub fn run() {
                     get_projects,
                     get_collections,
                     get_parsers,
+                    get_diagnostics,
                     process_sources,
                     cancel_processing,
                     save_processing_logs,
