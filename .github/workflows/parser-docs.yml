@@ -1,0 +1,40 @@
+name: Generate Parser Documentation
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  parser-docs:
+    name: Generate and upload parser documentation
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.14
+
+      - name: Install Python dependencies
+        run: uv sync --locked
+
+      - name: Generate parser documentation
+        run: uv run python scripts/generate_parser_docs.py
+
+      - name: Upload documentation to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload \
+            "${{ github.event.release.tag_name }}" \
+            AVAILABLE_PARSERS.md \
+            --clobber
