@@ -322,29 +322,18 @@ def get_collections(request: CollectionsRequest) -> CollectionsResult:
     try:
         openbis = get_authenticated_openbis(request)
 
-        projects_started = perf_counter()
+        started = perf_counter()
 
-        projects = openbis.get_projects(space=request.space, code=request.project)
-
-        log_timing(
-            f"openbis_request=collection_project_lookup "
-            f"openbis_request_ms="
-            f"{(perf_counter() - projects_started) * 1000:.0f}"
+        raw_collections = openbis.get_collections(
+            space=request.space,
+            project=request.project,
+            props=["$name"],
         )
-
-        if not projects:
-            return CollectionsResult(success=True, collections=[])
-
-        project = projects[0]
-
-        collections_started = perf_counter()
-
-        raw_collections = project.get_collections()
 
         log_timing(
             f"openbis_request=collections "
             f"openbis_request_ms="
-            f"{(perf_counter() - collections_started) * 1000:.0f}"
+            f"{(perf_counter() - started) * 1000:.0f}"
         )
 
         collections = [
@@ -355,9 +344,7 @@ def get_collections(request: CollectionsRequest) -> CollectionsResult:
             for collection in raw_collections
         ]
 
-        collections.sort(
-            key=lambda collection: collection.label.casefold(),
-        )
+        collections.sort(key=lambda collection: collection.label.casefold())
 
         return CollectionsResult(success=True, collections=collections)
 
