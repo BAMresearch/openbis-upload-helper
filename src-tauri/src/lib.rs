@@ -46,7 +46,7 @@ use std::sync::{
     Arc,
     Mutex,
 };
-
+use std::collections::HashMap;
 
 #[cfg(not(debug_assertions))]
 use tauri_plugin_shell::{
@@ -86,6 +86,17 @@ struct AuthState {
 
     #[serde(skip)]
     spaces: Option<Vec<String>>,
+
+    #[serde(skip)]
+    projects:
+        HashMap<String, Vec<String>>,
+
+    #[serde(skip)]
+    collections:
+        HashMap<
+            (String, String),
+            Vec<CollectionOption>,
+        >,
 }
 
 struct ProcessingState {
@@ -128,7 +139,7 @@ struct CollectionsRequest {
     project: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct CollectionOption {
     code: String,
     label: String,
@@ -1258,6 +1269,11 @@ async fn login(
                             python_result.spaces.clone(),
                         )
                     },
+                projects:
+                    HashMap::new(),
+
+                collections:
+                    HashMap::new(),
             },
         );
     }
@@ -1343,6 +1359,123 @@ fn cached_spaces(
     Ok(auth.spaces)
 }
 
+fn cached_projects(
+    state: &AppState,
+    space: &str,
+) -> Result<Option<Vec<String>>, String> {
+    let auth =
+        state
+            .auth
+            .lock()
+            .map_err(|_| {
+                "Failed to access authentication state."
+                    .to_string()
+            })?;
+
+    let auth =
+        auth
+            .as_ref()
+            .ok_or_else(|| {
+                "Not authenticated.".to_string()
+            })?;
+
+    Ok(
+        auth.projects
+            .get(space)
+            .cloned(),
+    )
+}
+
+fn cache_projects(
+    state: &AppState,
+    space: String,
+    projects: Vec<String>,
+) -> Result<(), String> {
+    let mut auth =
+        state
+            .auth
+            .lock()
+            .map_err(|_| {
+                "Failed to access authentication state."
+                    .to_string()
+            })?;
+
+    let auth =
+        auth
+            .as_mut()
+            .ok_or_else(|| {
+                "Not authenticated.".to_string()
+            })?;
+
+    auth.projects.insert(
+        space,
+        projects,
+    );
+
+    Ok(())
+}
+
+fn cached_collections(
+    state: &AppState,
+    space: &str,
+    project: &str,
+) -> Result<Option<Vec<CollectionOption>>, String> {
+    let auth =
+        state
+            .auth
+            .lock()
+            .map_err(|_| {
+                "Failed to access authentication state."
+                    .to_string()
+            })?;
+
+    let auth =
+        auth
+            .as_ref()
+            .ok_or_else(|| {
+                "Not authenticated.".to_string()
+            })?;
+
+    Ok(
+        auth.collections
+            .get(&(
+                space.to_string(),
+                project.to_string(),
+            ))
+            .cloned(),
+    )
+}
+
+fn cache_collections(
+    state: &AppState,
+    space: String,
+    project: String,
+    collections: Vec<CollectionOption>,
+) -> Result<(), String> {
+    let mut auth =
+        state
+            .auth
+            .lock()
+            .map_err(|_| {
+                "Failed to access authentication state."
+                    .to_string()
+            })?;
+
+    let auth =
+        auth
+            .as_mut()
+            .ok_or_else(|| {
+                "Not authenticated.".to_string()
+            })?;
+
+    auth.collections.insert(
+        (space, project),
+        collections,
+    );
+
+    Ok(())
+}
+
 #[tauri::command]
 async fn get_spaces(
     app: tauri::AppHandle,
@@ -1402,12 +1535,27 @@ async fn get_projects(
     state: tauri::State<'_, AppState>,
     space: String,
 ) -> Result<ProjectsResult, String> {
+    if let Some(projects) =
+        cached_projects(
+            &state,
+            &space,
+        )?
+    {
+        return Ok(
+            ProjectsResult {
+                success: true,
+                projects,
+                error: None,
+            },
+        );
+    }
+
     let auth = get_auth_state(&state)?;
 
     let request = ProjectsRequest {
         server_url: auth.server_url,
         token: auth.token,
-        space,
+        space: space.clone(),
     };
 
     let payload =
@@ -1434,14 +1582,25 @@ async fn get_projects(
             )
         })??;
 
-    serde_json::from_slice::<ProjectsResult>(
-        &output,
-    )
-    .map_err(|error| {
-        format!(
-            "Invalid response from Python backend: {error}"
+    let result =
+        serde_json::from_slice::<ProjectsResult>(
+            &output,
         )
-    })
+        .map_err(|error| {
+            format!(
+                "Invalid response from Python backend: {error}"
+            )
+        })?;
+
+    if result.success {
+        cache_projects(
+            &state,
+            space,
+            result.projects.clone(),
+        )?;
+    }
+
+    Ok(result)
 }
 
 #[tauri::command]
@@ -1451,13 +1610,29 @@ async fn get_collections(
     space: String,
     project: String,
 ) -> Result<CollectionsResult, String> {
+    if let Some(collections) =
+        cached_collections(
+            &state,
+            &space,
+            &project,
+        )?
+    {
+        return Ok(
+            CollectionsResult {
+                success: true,
+                collections,
+                error: None,
+            },
+        );
+    }
+
     let auth = get_auth_state(&state)?;
 
     let request = CollectionsRequest {
         server_url: auth.server_url,
         token: auth.token,
-        space,
-        project,
+        space: space.clone(),
+        project: project.clone(),
     };
 
     let payload =
@@ -1484,14 +1659,26 @@ async fn get_collections(
             )
         })??;
 
-    serde_json::from_slice::<CollectionsResult>(
-        &output,
-    )
-    .map_err(|error| {
-        format!(
-            "Invalid response from Python backend: {error}"
+    let result =
+        serde_json::from_slice::<CollectionsResult>(
+            &output,
         )
-    })
+        .map_err(|error| {
+            format!(
+                "Invalid response from Python backend: {error}"
+            )
+        })?;
+
+    if result.success {
+        cache_collections(
+            &state,
+            space,
+            project,
+            result.collections.clone(),
+        )?;
+    }
+
+    Ok(result)
 }
 
 #[tauri::command]
@@ -1994,6 +2181,12 @@ mod tests {
                                 .to_string(),
                         spaces:
                             None,
+
+                        projects:
+                            HashMap::new(),
+
+                        collections:
+                            HashMap::new(),
                     },
                 ),
             ),
@@ -2027,6 +2220,10 @@ mod tests {
                                     "SPACE_B".to_string(),
                                 ],
                             ),
+                        projects:
+                            HashMap::new(),
+                        collections:
+                            HashMap::new(),
                     },
                 ),
             ),
