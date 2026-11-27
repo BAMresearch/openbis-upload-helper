@@ -87,6 +87,7 @@ ignore = [
     "PLW2901", # redefined-loop-name
     "PLR1714", # consider-using-in
     "PLR5501", # else-if-used
+    "PLC0415", # imports at top
 ]
 fixable = ["ALL"]
 # Allow unused variables when underscore-prefixed.

@@ -6,26 +6,26 @@ import argparse
 import json
 import sys
 
-from openbis_upload_helper.client.openbis import (
-    AuthRequest,
-    CollectionsRequest,
-    LoginRequest,
-    ProjectsRequest,
-    get_collections,
-    get_projects,
-    get_spaces,
-    login,
-)
-from openbis_upload_helper.parsers.processing_logger import (
-    create_processing_logger,
-)
-from openbis_upload_helper.parsers.registry import (
-    list_parsers,
-)
-from openbis_upload_helper.parsers.runner import (
-    ProcessRequest,
-    run_parsers,
-)
+# from openbis_upload_helper.client.openbis import (
+#     AuthRequest,
+#     CollectionsRequest,
+#     LoginRequest,
+#     ProjectsRequest,
+#     get_collections,
+#     get_projects,
+#     get_spaces,
+#     login,
+# )
+# from openbis_upload_helper.parsers.processing_logger import (
+#     create_processing_logger,
+# )
+# from openbis_upload_helper.parsers.registry import (
+#     list_parsers,
+# )
+# from openbis_upload_helper.parsers.runner import (
+#     ProcessRequest,
+#     run_parsers,
+# )
 from openbis_upload_helper.timing import log_timing
 
 
@@ -71,21 +71,10 @@ def main() -> None:
         return
 
     if args.command == "login":
-        # input is a JSON payload with the login request, e.g.:
-        # {
-        #   "server_url": "https://local.openbis.ch/openbis",
-        #   "username": "admin",
-        #   "password": "test",
-        #   "personal_access_token": ""
-        # }
+        from openbis_upload_helper.client.openbis import LoginRequest, login
+
         payload = read_payload(args.input_file)
 
-        # output is a JSON payload with the login result, e.g.:
-        # {
-        #   "success": true,
-        #   "username": "admin",
-        #   "error": null
-        # }
         request = LoginRequest.model_validate_json(payload)
         result = login(request)
 
@@ -93,6 +82,8 @@ def main() -> None:
         return
 
     if args.command == "spaces":
+        from openbis_upload_helper.client.openbis import AuthRequest, get_spaces
+
         payload = read_payload(args.input_file)
 
         request = AuthRequest.model_validate_json(payload)
@@ -102,6 +93,8 @@ def main() -> None:
         return
 
     if args.command == "projects":
+        from openbis_upload_helper.client.openbis import ProjectsRequest, get_projects
+
         payload = read_payload(args.input_file)
 
         request = ProjectsRequest.model_validate_json(payload)
@@ -111,6 +104,11 @@ def main() -> None:
         return
 
     if args.command == "collections":
+        from openbis_upload_helper.client.openbis import (
+            CollectionsRequest,
+            get_collections,
+        )
+
         payload = read_payload(args.input_file)
 
         request = CollectionsRequest.model_validate_json(payload)
@@ -120,19 +118,21 @@ def main() -> None:
         return
 
     if args.command == "parsers":
+        from openbis_upload_helper.parsers.registry import list_parsers
+
         result = list_parsers()
 
         print(result.model_dump_json())
         return
 
     if args.command == "process":
-        payload = read_payload(
-            args.input_file,
+        from openbis_upload_helper.parsers.processing_logger import (
+            create_processing_logger,
         )
+        from openbis_upload_helper.parsers.runner import ProcessRequest, run_parsers
 
-        request = ProcessRequest.model_validate_json(
-            payload,
-        )
+        payload = read_payload(args.input_file)
+        request = ProcessRequest.model_validate_json(payload)
 
         logger = create_processing_logger()
 
@@ -144,10 +144,7 @@ def main() -> None:
             jobs=len(request.jobs),
         )
 
-        result = run_parsers(
-            request,
-            logger=logger,
-        )
+        result = run_parsers(request, logger=logger)
 
         print(
             json.dumps(
