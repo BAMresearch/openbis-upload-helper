@@ -418,6 +418,11 @@ fn run_processing_command(
                         continue;
                     }
 
+                    if line.starts_with("[timing]") {
+                        eprintln!("{line}");
+                        continue;
+                    }
+
                     let event =
                         ProcessingEvent {
                             kind:
