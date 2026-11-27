@@ -1,9 +1,12 @@
 from dataclasses import dataclass
 from importlib import metadata
+from time import perf_counter
 from typing import Any
 
 from bam_masterdata.parsing import AbstractParser
 from pydantic import BaseModel, Field
+
+from openbis_upload_helper.timing import log_timing
 
 ENTRY_POINT_GROUP = "bam.parsers"
 
@@ -47,6 +50,8 @@ def discover_parsers() -> dict[str, ParserPlugin]:
     The loaded entry point is expected to expose the metadata dictionary
     used by BAM parser packages, including ``name`` and ``parser_class``.
     """
+    started = perf_counter()
+
     parsers: dict[str, ParserPlugin] = {}
 
     entry_points = metadata.entry_points(group=ENTRY_POINT_GROUP)
@@ -89,6 +94,12 @@ def discover_parsers() -> dict[str, ParserPlugin]:
             version=_entry_point_version(entry_point),
             parser_class=parser_class,
         )
+
+    log_timing(
+        f"parser_discovery_ms="
+        f"{(perf_counter() - started) * 1000:.0f} "
+        f"parser_count={len(parsers)}"
+    )
 
     return parsers
 

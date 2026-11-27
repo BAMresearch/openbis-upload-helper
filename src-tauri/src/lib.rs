@@ -46,7 +46,7 @@ use std::sync::{
     Arc,
     Mutex,
 };
-
+use std::collections::HashMap;
 
 #[cfg(not(debug_assertions))]
 use tauri_plugin_shell::{
@@ -67,6 +67,7 @@ struct PythonLoginResult {
     success: bool,
     username: Option<String>,
     token: Option<String>,
+    spaces: Vec<String>,
     error: Option<String>,
 }
 
@@ -82,6 +83,20 @@ struct LoginResult {
 struct AuthState {
     server_url: String,
     token: String,
+
+    #[serde(skip)]
+    spaces: Option<Vec<String>>,
+
+    #[serde(skip)]
+    projects:
+        HashMap<String, Vec<String>>,
+
+    #[serde(skip)]
+    collections:
+        HashMap<
+            (String, String),
+            Vec<CollectionOption>,
+        >,
 }
 
 struct ProcessingState {
@@ -124,7 +139,7 @@ struct CollectionsRequest {
     project: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct CollectionOption {
     code: String,
     label: String,
@@ -278,7 +293,9 @@ fn run_processing_command(
             executable,
         );
 
-    child.arg("process");
+    child
+        .arg("process")
+        .env("OUH_TIMING", "1");
 
     let mut child = child
         .env("PYTHONUNBUFFERED", "1")
@@ -413,6 +430,11 @@ fn run_processing_command(
                             .unwrap_or(false);
 
                     if cancelled {
+                        continue;
+                    }
+
+                    if line.starts_with("[timing]") {
+                        eprintln!("{line}");
                         continue;
                     }
 
@@ -973,6 +995,10 @@ fn run_processing_command(
                             continue;
                         }
 
+                        if line.starts_with("[timing]") {
+                            eprintln!("{line}");
+                            continue;
+                        }
 
                         let event =
                             ProcessingEvent {
@@ -1234,6 +1260,20 @@ async fn login(
             AuthState {
                 server_url,
                 token,
+
+                spaces:
+                    if python_result.spaces.is_empty() {
+                        None
+                    } else {
+                        Some(
+                            python_result.spaces.clone(),
+                        )
+                    },
+                projects:
+                    HashMap::new(),
+
+                collections:
+                    HashMap::new(),
             },
         );
     }
@@ -1310,98 +1350,369 @@ fn get_auth_state(
         })
 }
 
-#[tauri::command]
-fn get_spaces(
-    app: tauri::AppHandle,
-    state: tauri::State<AppState>,
-) -> Result<SpacesResult, String> {
-    let auth = get_auth_state(&state)?;
+fn cached_spaces(
+    state: &AppState,
+) -> Result<Option<Vec<String>>, String> {
+    let auth =
+        get_auth_state(state)?;
 
-    let payload = serde_json::to_string(&auth).map_err(|error| error.to_string())?;
+    Ok(auth.spaces)
+}
 
-    let output =
-        backend::run(
-            &app,
-            "spaces",
-            &payload,
-        )?;
+fn cached_projects(
+    state: &AppState,
+    space: &str,
+) -> Result<Option<Vec<String>>, String> {
+    let auth =
+        state
+            .auth
+            .lock()
+            .map_err(|_| {
+                "Failed to access authentication state."
+                    .to_string()
+            })?;
 
-    serde_json::from_slice::<SpacesResult>(&output)
-        .map_err(|error| format!("Invalid response from Python backend: {error}"))
+    let auth =
+        auth
+            .as_ref()
+            .ok_or_else(|| {
+                "Not authenticated.".to_string()
+            })?;
+
+    Ok(
+        auth.projects
+            .get(space)
+            .cloned(),
+    )
+}
+
+fn cache_projects(
+    state: &AppState,
+    space: String,
+    projects: Vec<String>,
+) -> Result<(), String> {
+    let mut auth =
+        state
+            .auth
+            .lock()
+            .map_err(|_| {
+                "Failed to access authentication state."
+                    .to_string()
+            })?;
+
+    let auth =
+        auth
+            .as_mut()
+            .ok_or_else(|| {
+                "Not authenticated.".to_string()
+            })?;
+
+    auth.projects.insert(
+        space,
+        projects,
+    );
+
+    Ok(())
+}
+
+fn cached_collections(
+    state: &AppState,
+    space: &str,
+    project: &str,
+) -> Result<Option<Vec<CollectionOption>>, String> {
+    let auth =
+        state
+            .auth
+            .lock()
+            .map_err(|_| {
+                "Failed to access authentication state."
+                    .to_string()
+            })?;
+
+    let auth =
+        auth
+            .as_ref()
+            .ok_or_else(|| {
+                "Not authenticated.".to_string()
+            })?;
+
+    Ok(
+        auth.collections
+            .get(&(
+                space.to_string(),
+                project.to_string(),
+            ))
+            .cloned(),
+    )
+}
+
+fn cache_collections(
+    state: &AppState,
+    space: String,
+    project: String,
+    collections: Vec<CollectionOption>,
+) -> Result<(), String> {
+    let mut auth =
+        state
+            .auth
+            .lock()
+            .map_err(|_| {
+                "Failed to access authentication state."
+                    .to_string()
+            })?;
+
+    let auth =
+        auth
+            .as_mut()
+            .ok_or_else(|| {
+                "Not authenticated.".to_string()
+            })?;
+
+    auth.collections.insert(
+        (space, project),
+        collections,
+    );
+
+    Ok(())
 }
 
 #[tauri::command]
-fn get_projects(
+async fn get_spaces(
     app: tauri::AppHandle,
-    state: tauri::State<AppState>, space: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<SpacesResult, String> {
+    if let Some(spaces) =
+        cached_spaces(&state)?
+    {
+        return Ok(
+            SpacesResult {
+                success: true,
+                spaces,
+                error: None,
+            },
+        );
+    }
+
+    let auth = get_auth_state(&state)?;
+
+    let payload =
+        serde_json::to_string(&auth)
+            .map_err(|error| error.to_string())?;
+
+    let backend_app =
+        app.clone();
+
+    let output =
+        tauri::async_runtime::spawn_blocking(
+            move || {
+                backend::run(
+                    &backend_app,
+                    "spaces",
+                    &payload,
+                )
+            },
+        )
+        .await
+        .map_err(|error| {
+            format!(
+                "Spaces worker failed: {error}"
+            )
+        })??;
+
+    serde_json::from_slice::<SpacesResult>(
+        &output,
+    )
+    .map_err(|error| {
+        format!(
+            "Invalid response from Python backend: {error}"
+        )
+    })
+}
+
+#[tauri::command]
+async fn get_projects(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    space: String,
 ) -> Result<ProjectsResult, String> {
+    if let Some(projects) =
+        cached_projects(
+            &state,
+            &space,
+        )?
+    {
+        return Ok(
+            ProjectsResult {
+                success: true,
+                projects,
+                error: None,
+            },
+        );
+    }
+
     let auth = get_auth_state(&state)?;
 
     let request = ProjectsRequest {
         server_url: auth.server_url,
         token: auth.token,
-        space,
+        space: space.clone(),
     };
 
-    let payload = serde_json::to_string(&request).map_err(|error| error.to_string())?;
+    let payload =
+        serde_json::to_string(&request)
+            .map_err(|error| error.to_string())?;
+
+    let backend_app =
+        app.clone();
 
     let output =
-        backend::run(
-            &app,
-            "projects",
-            &payload,
-        )?;
+        tauri::async_runtime::spawn_blocking(
+            move || {
+                backend::run(
+                    &backend_app,
+                    "projects",
+                    &payload,
+                )
+            },
+        )
+        .await
+        .map_err(|error| {
+            format!(
+                "Projects worker failed: {error}"
+            )
+        })??;
 
-    serde_json::from_slice::<ProjectsResult>(&output)
-        .map_err(|error| format!("Invalid response from Python backend: {error}"))
+    let result =
+        serde_json::from_slice::<ProjectsResult>(
+            &output,
+        )
+        .map_err(|error| {
+            format!(
+                "Invalid response from Python backend: {error}"
+            )
+        })?;
+
+    if result.success {
+        cache_projects(
+            &state,
+            space,
+            result.projects.clone(),
+        )?;
+    }
+
+    Ok(result)
 }
 
 #[tauri::command]
-fn get_collections(
+async fn get_collections(
     app: tauri::AppHandle,
-    state: tauri::State<AppState>,
+    state: tauri::State<'_, AppState>,
     space: String,
     project: String,
 ) -> Result<CollectionsResult, String> {
+    if let Some(collections) =
+        cached_collections(
+            &state,
+            &space,
+            &project,
+        )?
+    {
+        return Ok(
+            CollectionsResult {
+                success: true,
+                collections,
+                error: None,
+            },
+        );
+    }
+
     let auth = get_auth_state(&state)?;
 
     let request = CollectionsRequest {
         server_url: auth.server_url,
         token: auth.token,
-        space,
-        project,
+        space: space.clone(),
+        project: project.clone(),
     };
 
-    let payload = serde_json::to_string(&request).map_err(|error| error.to_string())?;
+    let payload =
+        serde_json::to_string(&request)
+            .map_err(|error| error.to_string())?;
+
+    let backend_app =
+        app.clone();
 
     let output =
-        backend::run(
-            &app,
-            "collections",
-            &payload,
-        )?;
+        tauri::async_runtime::spawn_blocking(
+            move || {
+                backend::run(
+                    &backend_app,
+                    "collections",
+                    &payload,
+                )
+            },
+        )
+        .await
+        .map_err(|error| {
+            format!(
+                "Collections worker failed: {error}"
+            )
+        })??;
 
-    serde_json::from_slice::<CollectionsResult>(&output)
-        .map_err(|error| format!("Invalid response from Python backend: {error}"))
-}
-
-#[tauri::command]
-fn get_parsers(
-    app: tauri::AppHandle,
-) -> Result<ParsersResult, String> {
-    let output =
-        backend::run(
-            &app,
-            "parsers",
-            "",
-        )?;
-
-    serde_json::from_slice::<ParsersResult>(&output)
+    let result =
+        serde_json::from_slice::<CollectionsResult>(
+            &output,
+        )
         .map_err(|error| {
             format!(
                 "Invalid response from Python backend: {error}"
             )
-        })
+        })?;
+
+    if result.success {
+        cache_collections(
+            &state,
+            space,
+            project,
+            result.collections.clone(),
+        )?;
+    }
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn get_parsers(
+    app: tauri::AppHandle,
+) -> Result<ParsersResult, String> {
+    let backend_app =
+        app.clone();
+
+    let output =
+        tauri::async_runtime::spawn_blocking(
+            move || {
+                backend::run(
+                    &backend_app,
+                    "parsers",
+                    "",
+                )
+            },
+        )
+        .await
+        .map_err(|error| {
+            format!(
+                "Parsers worker failed: {error}"
+            )
+        })??;
+
+    serde_json::from_slice::<ParsersResult>(
+        &output,
+    )
+    .map_err(|error| {
+        format!(
+            "Invalid response from Python backend: {error}"
+        )
+    })
 }
 
 #[tauri::command]
@@ -1868,6 +2179,14 @@ mod tests {
                         token:
                             "test-token"
                                 .to_string(),
+                        spaces:
+                            None,
+
+                        projects:
+                            HashMap::new(),
+
+                        collections:
+                            HashMap::new(),
                     },
                 ),
             ),
@@ -1880,6 +2199,44 @@ mod tests {
                     },
                 ),
             ),
+        }
+    }
+
+    fn app_state_with_cached_spaces() -> AppState {
+        AppState {
+            auth: Mutex::new(
+                Some(
+                    AuthState {
+                        server_url:
+                            "https://example.org"
+                                .to_string(),
+                        token:
+                            "test-token"
+                                .to_string(),
+                        spaces:
+                            Some(
+                                vec![
+                                    "SPACE_A".to_string(),
+                                    "SPACE_B".to_string(),
+                                ],
+                            ),
+                        projects:
+                            HashMap::new(),
+                        collections:
+                            HashMap::new(),
+                    },
+                ),
+            ),
+            processing:
+                Arc::new(
+                    Mutex::new(
+                        ProcessingState {
+                            running: false,
+                            cancel_requested: false,
+                            child: None,
+                        },
+                    ),
+                ),
         }
     }
 
@@ -1952,5 +2309,27 @@ mod tests {
             Err(ref error)
                 if error == "Not authenticated."
         ));
+    }
+
+    #[test]
+    fn cached_spaces_are_available_from_auth_state() {
+        let state =
+            app_state_with_cached_spaces();
+
+        let spaces =
+            cached_spaces(&state)
+                .expect(
+                    "cached spaces lookup should succeed",
+                );
+
+        assert_eq!(
+            spaces,
+            Some(
+                vec![
+                    "SPACE_A".to_string(),
+                    "SPACE_B".to_string(),
+                ],
+            ),
+        );
     }
 }

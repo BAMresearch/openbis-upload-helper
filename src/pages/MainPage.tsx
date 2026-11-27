@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -33,6 +34,10 @@ import {
 
 import type {
   ParserAssignments,
+} from "../features/parser/parser";
+
+import {
+  getParsers,
 } from "../features/parser/parser";
 
 import {
@@ -99,6 +104,9 @@ export function MainPage({
     setSourceRootPaths,
   ] = useState<string[]>([]);
 
+  useEffect(() => {
+    void getParsers();
+  }, []);
 
   const [
     parserAssignments,
