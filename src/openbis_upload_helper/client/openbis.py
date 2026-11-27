@@ -19,6 +19,7 @@ class LoginResult(BaseModel):
     success: bool
     username: str | None = None
     token: str | None = None
+    spaces: list[str] = Field(default_factory=list)
     error: str | None = None
 
 
@@ -198,17 +199,20 @@ def login(request: LoginRequest) -> LoginResult:
 
             validation_started = perf_counter()
 
-            openbis.get_spaces()
+            raw_spaces = openbis.get_spaces()
 
             log_timing(
                 f"login_pat_validation_ms="
                 f"{(perf_counter() - validation_started) * 1000:.0f}"
             )
 
+            spaces = sorted((space.code for space in raw_spaces), key=str.casefold)
+
             return LoginResult(
                 success=True,
                 username=(request.username or None),
                 token=openbis.token,
+                spaces=spaces,
             )
 
         if not request.username or not request.password:

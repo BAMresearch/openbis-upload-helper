@@ -67,6 +67,7 @@ struct PythonLoginResult {
     success: bool,
     username: Option<String>,
     token: Option<String>,
+    spaces: Vec<String>,
     error: Option<String>,
 }
 
@@ -82,6 +83,9 @@ struct LoginResult {
 struct AuthState {
     server_url: String,
     token: String,
+
+    #[serde(skip)]
+    spaces: Option<Vec<String>>,
 }
 
 struct ProcessingState {
@@ -1245,6 +1249,15 @@ async fn login(
             AuthState {
                 server_url,
                 token,
+
+                spaces:
+                    if python_result.spaces.is_empty() {
+                        None
+                    } else {
+                        Some(
+                            python_result.spaces.clone(),
+                        )
+                    },
             },
         );
     }
@@ -1321,14 +1334,37 @@ fn get_auth_state(
         })
 }
 
+fn cached_spaces(
+    state: &AppState,
+) -> Result<Option<Vec<String>>, String> {
+    let auth =
+        get_auth_state(state)?;
+
+    Ok(auth.spaces)
+}
+
 #[tauri::command]
 fn get_spaces(
     app: tauri::AppHandle,
     state: tauri::State<AppState>,
 ) -> Result<SpacesResult, String> {
+    if let Some(spaces) =
+        cached_spaces(&state)?
+    {
+        return Ok(
+            SpacesResult {
+                success: true,
+                spaces,
+                error: None,
+            },
+        );
+    }
+
     let auth = get_auth_state(&state)?;
 
-    let payload = serde_json::to_string(&auth).map_err(|error| error.to_string())?;
+    let payload =
+        serde_json::to_string(&auth)
+            .map_err(|error| error.to_string())?;
 
     let output =
         backend::run(
@@ -1879,6 +1915,8 @@ mod tests {
                         token:
                             "test-token"
                                 .to_string(),
+                        spaces:
+                            None,
                     },
                 ),
             ),
@@ -1891,6 +1929,40 @@ mod tests {
                     },
                 ),
             ),
+        }
+    }
+
+    fn app_state_with_cached_spaces() -> AppState {
+        AppState {
+            auth: Mutex::new(
+                Some(
+                    AuthState {
+                        server_url:
+                            "https://example.org"
+                                .to_string(),
+                        token:
+                            "test-token"
+                                .to_string(),
+                        spaces:
+                            Some(
+                                vec![
+                                    "SPACE_A".to_string(),
+                                    "SPACE_B".to_string(),
+                                ],
+                            ),
+                    },
+                ),
+            ),
+            processing:
+                Arc::new(
+                    Mutex::new(
+                        ProcessingState {
+                            running: false,
+                            cancel_requested: false,
+                            child: None,
+                        },
+                    ),
+                ),
         }
     }
 
@@ -1963,5 +2035,27 @@ mod tests {
             Err(ref error)
                 if error == "Not authenticated."
         ));
+    }
+
+    #[test]
+    fn cached_spaces_are_available_from_auth_state() {
+        let state =
+            app_state_with_cached_spaces();
+
+        let spaces =
+            cached_spaces(&state)
+                .expect(
+                    "cached spaces lookup should succeed",
+                );
+
+        assert_eq!(
+            spaces,
+            Some(
+                vec![
+                    "SPACE_A".to_string(),
+                    "SPACE_B".to_string(),
+                ],
+            ),
+        );
     }
 }
