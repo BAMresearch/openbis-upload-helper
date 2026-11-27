@@ -40,8 +40,29 @@ export type ParserAssignments =
   Record<string, ParserAssignment>;
 
 
+let parsersRequest:
+  Promise<ParsersResult> | null =
+    null;
+
 export async function getParsers(): Promise<ParsersResult> {
-  return invoke<ParsersResult>(
-    "get_parsers",
-  );
+  if (!parsersRequest) {
+    parsersRequest =
+      invoke<ParsersResult>(
+        "get_parsers",
+      ).then(
+        (result) => {
+          if (!result.success) {
+            parsersRequest = null;
+          }
+
+          return result;
+        },
+        (error) => {
+          parsersRequest = null;
+          throw error;
+        },
+      );
+  }
+
+  return parsersRequest;
 }
