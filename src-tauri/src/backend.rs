@@ -146,11 +146,20 @@ fn run_development(
         Stdio,
     };
 
+    use std::time::Instant;
+
+    let total_started =
+        Instant::now();
+
+    let startup_started =
+        Instant::now();
+
     let mut child =
         Command::new(
             development_backend_executable(),
         )
         .arg(command_name)
+        .env("OUH_TIMING", "1")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -160,6 +169,12 @@ fn run_development(
                 "Failed to start Python backend: {error}"
             )
         })?;
+
+    eprintln!(
+        "[timing] command={} backend_start_ms={}",
+        command_name,
+        startup_started.elapsed().as_millis(),
+    );
 
     if let Some(mut stdin) =
         child.stdin.take()
@@ -184,12 +199,27 @@ fn run_development(
                 )
             })?;
 
+    if !output.stderr.is_empty() {
+        eprint!(
+            "{}",
+            String::from_utf8_lossy(
+                &output.stderr,
+            ),
+        );
+    }
+
     if !output.status.success() {
         return Err(
             "The application backend failed unexpectedly."
                 .to_string(),
         );
     }
+
+    eprintln!(
+        "[timing] command={} backend_total_ms={}",
+        command_name,
+        total_started.elapsed().as_millis(),
+    );
 
     Ok(output.stdout)
 }
@@ -202,6 +232,14 @@ fn run_sidecar(
     payload: &str,
 ) -> Result<Vec<u8>, String> {
     use tauri_plugin_shell::process::CommandEvent;
+
+    use std::time::Instant;
+
+    let total_started =
+        Instant::now();
+
+    let startup_started =
+        Instant::now();
 
     let command =
         app
@@ -224,6 +262,12 @@ fn run_sidecar(
                     "Failed to start Python sidecar: {error}"
                 )
             })?;
+
+    eprintln!(
+        "[timing] command={} backend_start_ms={}",
+        command_name,
+        startup_started.elapsed().as_millis(),
+    );
 
     /*
      * Commands such as login/spaces/projects/collections
@@ -313,6 +357,12 @@ fn run_sidecar(
             ),
         );
     }
+
+    eprintln!(
+        "[timing] command={} backend_total_ms={}",
+        command_name,
+        total_started.elapsed().as_millis(),
+    );
 
     Ok(stdout)
 }

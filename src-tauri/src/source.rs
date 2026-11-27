@@ -1,5 +1,6 @@
 use serde::Serialize;
 use std::fs;
+use std::time::Instant;
 use std::path::{Path, PathBuf};
 
 
@@ -113,6 +114,12 @@ fn scan_path(path: &Path) -> Result<SourceNode, String> {
 pub fn scan_sources(
     paths: Vec<String>,
 ) -> Result<Vec<SourceNode>, String> {
+    let started =
+        Instant::now();
+
+    let root_count =
+        paths.len();
+
     let mut sources = Vec::new();
 
     for raw_path in paths {
@@ -124,6 +131,12 @@ pub fn scan_sources(
 
         sources.push(scan_path(&path)?);
     }
+
+    eprintln!(
+        "[timing] source_scan_ms={} source_roots={}",
+        started.elapsed().as_millis(),
+        root_count,
+    );
 
     Ok(sources)
 }

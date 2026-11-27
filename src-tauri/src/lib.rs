@@ -278,7 +278,9 @@ fn run_processing_command(
             executable,
         );
 
-    child.arg("process");
+    child
+        .arg("process")
+        .env("OUH_TIMING", "1");
 
     let mut child = child
         .env("PYTHONUNBUFFERED", "1")
@@ -973,6 +975,10 @@ fn run_processing_command(
                             continue;
                         }
 
+                        if line.starts_with("[timing]") {
+                            eprintln!("{line}");
+                            continue;
+                        }
 
                         let event =
                             ProcessingEvent {

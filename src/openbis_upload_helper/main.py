@@ -1,3 +1,7 @@
+from time import perf_counter
+
+_PROCESS_STARTED = perf_counter()
+
 import argparse
 import json
 import sys
@@ -22,6 +26,7 @@ from openbis_upload_helper.parsers.runner import (
     ProcessRequest,
     run_parsers,
 )
+from openbis_upload_helper.timing import log_timing
 
 
 def read_payload(input_file: str | None) -> str:
@@ -54,6 +59,12 @@ def main() -> None:
     subparsers.add_parser("process")
 
     args = parser.parse_args()
+
+    log_timing(
+        f"command={args.command} "
+        f"python_startup_import_ms="
+        f"{(perf_counter() - _PROCESS_STARTED) * 1000:.0f}"
+    )
 
     if args.command == "hello":
         print('{"message":"Hello from Python"}')

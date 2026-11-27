@@ -1,4 +1,5 @@
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 from bam_masterdata.cli.run_parser import RunParsers
@@ -11,6 +12,7 @@ from openbis_upload_helper.client.openbis import (
     openbis_error_message,
 )
 from openbis_upload_helper.parsers.registry import discover_parsers
+from openbis_upload_helper.timing import log_timing
 
 
 class ParserJobRequest(BaseModel):
@@ -38,9 +40,7 @@ class ProcessResult(BaseModel):
     error: str | None = None
 
 
-def validate_file_path(
-    raw_path: str,
-) -> str:
+def validate_file_path(raw_path: str) -> str:
     path = Path(raw_path)
 
     if not path.is_absolute():
@@ -62,9 +62,7 @@ def validate_file_path(
     return str(path)
 
 
-def build_files_parser(
-    jobs: list[ParserJobRequest],
-) -> dict[AbstractParser, list[str]]:
+def build_files_parser(jobs: list[ParserJobRequest]) -> dict[AbstractParser, list[str]]:
     """
     Convert processing jobs into the structure expected
     by RunParsers.
@@ -119,10 +117,7 @@ def build_files_parser(
     return files_parser
 
 
-def run_parsers(
-    request: ProcessRequest,
-    logger: Any,
-) -> ProcessResult:
+def run_parsers(request: ProcessRequest, logger: Any) -> ProcessResult:
     """
     Execute one processing operation.
 
@@ -138,8 +133,13 @@ def run_parsers(
             stage="validation",
         )
 
-        files_parser = build_files_parser(
-            request.jobs,
+        validation_started = perf_counter()
+
+        files_parser = build_files_parser(request.jobs)
+
+        log_timing(
+            f"processing_validation_ms="
+            f"{(perf_counter() - validation_started) * 1000:.0f}"
         )
 
         processed_files = sum(len(paths) for paths in files_parser.values())
@@ -159,7 +159,12 @@ def run_parsers(
         )
 
         current_stage = "openbis"
+        openbis_started = perf_counter()
         openbis = get_authenticated_openbis(request)
+        log_timing(
+            f"processing_openbis_setup_ms="
+            f"{(perf_counter() - openbis_started) * 1000:.0f}"
+        )
 
         logger.info(
             "Initializing processing.",
@@ -168,6 +173,7 @@ def run_parsers(
         )
 
         current_stage = "initialization"
+        initialization_started = perf_counter()
         runner = RunParsers(
             openbis=openbis,
             space_name=request.space,
@@ -175,6 +181,10 @@ def run_parsers(
             collection_name=request.collection,
             files_parser=files_parser,
             logger=logger,
+        )
+        log_timing(
+            f"processing_initialization_ms="
+            f"{(perf_counter() - initialization_started) * 1000:.0f}"
         )
 
         logger.info(
@@ -184,7 +194,9 @@ def run_parsers(
         )
 
         current_stage = "processing"
+        runner_started = perf_counter()
         runner.run()
+        log_timing(f"runner_run_ms={(perf_counter() - runner_started) * 1000:.0f}")
 
         logger.info(
             "Processing completed.",
