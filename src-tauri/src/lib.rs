@@ -1344,9 +1344,9 @@ fn cached_spaces(
 }
 
 #[tauri::command]
-fn get_spaces(
+async fn get_spaces(
     app: tauri::AppHandle,
-    state: tauri::State<AppState>,
+    state: tauri::State<'_, AppState>,
 ) -> Result<SpacesResult, String> {
     if let Some(spaces) =
         cached_spaces(&state)?
@@ -1366,21 +1366,41 @@ fn get_spaces(
         serde_json::to_string(&auth)
             .map_err(|error| error.to_string())?;
 
-    let output =
-        backend::run(
-            &app,
-            "spaces",
-            &payload,
-        )?;
+    let backend_app =
+        app.clone();
 
-    serde_json::from_slice::<SpacesResult>(&output)
-        .map_err(|error| format!("Invalid response from Python backend: {error}"))
+    let output =
+        tauri::async_runtime::spawn_blocking(
+            move || {
+                backend::run(
+                    &backend_app,
+                    "spaces",
+                    &payload,
+                )
+            },
+        )
+        .await
+        .map_err(|error| {
+            format!(
+                "Spaces worker failed: {error}"
+            )
+        })??;
+
+    serde_json::from_slice::<SpacesResult>(
+        &output,
+    )
+    .map_err(|error| {
+        format!(
+            "Invalid response from Python backend: {error}"
+        )
+    })
 }
 
 #[tauri::command]
-fn get_projects(
+async fn get_projects(
     app: tauri::AppHandle,
-    state: tauri::State<AppState>, space: String,
+    state: tauri::State<'_, AppState>,
+    space: String,
 ) -> Result<ProjectsResult, String> {
     let auth = get_auth_state(&state)?;
 
@@ -1390,23 +1410,44 @@ fn get_projects(
         space,
     };
 
-    let payload = serde_json::to_string(&request).map_err(|error| error.to_string())?;
+    let payload =
+        serde_json::to_string(&request)
+            .map_err(|error| error.to_string())?;
+
+    let backend_app =
+        app.clone();
 
     let output =
-        backend::run(
-            &app,
-            "projects",
-            &payload,
-        )?;
+        tauri::async_runtime::spawn_blocking(
+            move || {
+                backend::run(
+                    &backend_app,
+                    "projects",
+                    &payload,
+                )
+            },
+        )
+        .await
+        .map_err(|error| {
+            format!(
+                "Projects worker failed: {error}"
+            )
+        })??;
 
-    serde_json::from_slice::<ProjectsResult>(&output)
-        .map_err(|error| format!("Invalid response from Python backend: {error}"))
+    serde_json::from_slice::<ProjectsResult>(
+        &output,
+    )
+    .map_err(|error| {
+        format!(
+            "Invalid response from Python backend: {error}"
+        )
+    })
 }
 
 #[tauri::command]
-fn get_collections(
+async fn get_collections(
     app: tauri::AppHandle,
-    state: tauri::State<AppState>,
+    state: tauri::State<'_, AppState>,
     space: String,
     project: String,
 ) -> Result<CollectionsResult, String> {
@@ -1419,36 +1460,72 @@ fn get_collections(
         project,
     };
 
-    let payload = serde_json::to_string(&request).map_err(|error| error.to_string())?;
+    let payload =
+        serde_json::to_string(&request)
+            .map_err(|error| error.to_string())?;
+
+    let backend_app =
+        app.clone();
 
     let output =
-        backend::run(
-            &app,
-            "collections",
-            &payload,
-        )?;
+        tauri::async_runtime::spawn_blocking(
+            move || {
+                backend::run(
+                    &backend_app,
+                    "collections",
+                    &payload,
+                )
+            },
+        )
+        .await
+        .map_err(|error| {
+            format!(
+                "Collections worker failed: {error}"
+            )
+        })??;
 
-    serde_json::from_slice::<CollectionsResult>(&output)
-        .map_err(|error| format!("Invalid response from Python backend: {error}"))
+    serde_json::from_slice::<CollectionsResult>(
+        &output,
+    )
+    .map_err(|error| {
+        format!(
+            "Invalid response from Python backend: {error}"
+        )
+    })
 }
 
 #[tauri::command]
-fn get_parsers(
+async fn get_parsers(
     app: tauri::AppHandle,
 ) -> Result<ParsersResult, String> {
-    let output =
-        backend::run(
-            &app,
-            "parsers",
-            "",
-        )?;
+    let backend_app =
+        app.clone();
 
-    serde_json::from_slice::<ParsersResult>(&output)
+    let output =
+        tauri::async_runtime::spawn_blocking(
+            move || {
+                backend::run(
+                    &backend_app,
+                    "parsers",
+                    "",
+                )
+            },
+        )
+        .await
         .map_err(|error| {
             format!(
-                "Invalid response from Python backend: {error}"
+                "Parsers worker failed: {error}"
             )
-        })
+        })??;
+
+    serde_json::from_slice::<ParsersResult>(
+        &output,
+    )
+    .map_err(|error| {
+        format!(
+            "Invalid response from Python backend: {error}"
+        )
+    })
 }
 
 #[tauri::command]
